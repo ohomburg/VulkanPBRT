@@ -898,7 +898,8 @@ bool    ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass rend
     IM_ASSERT(info->Device != VK_NULL_HANDLE);
     IM_ASSERT(info->Queue != VK_NULL_HANDLE);
     IM_ASSERT(info->DescriptorPool != VK_NULL_HANDLE);
-    IM_ASSERT(info->MinImageCount >= 2);
+    IM_ASSERT(info->ImageCount >= 2); // FIX (OH): checking minImageCount pointlessly excludes surfaces with more lax capabilities
+    //IM_ASSERT(info->MinImageCount >= 2); // Altered line.
     IM_ASSERT(info->ImageCount >= info->MinImageCount);
     IM_ASSERT(render_pass != VK_NULL_HANDLE);
 
