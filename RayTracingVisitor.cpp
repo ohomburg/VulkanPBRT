@@ -328,6 +328,15 @@ void RayTracingSceneDescriptorCreationVisitor::apply(const vsg::Light& l)
 {
     packedLights.push_back(l.getPacked());
 }
+void RayTracingSceneDescriptorCreationVisitor::apply(vsg::Volumetric& vol)
+{
+    auto sampler = vsg::Sampler::create();
+    auto image = vol.voxels;
+
+    auto desc = vsg::DescriptorImage::create(sampler, image, 15, _volume.size());
+    _volume.push_back(desc);
+    isOpaque.push_back(true);
+}
 vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::getBindDescriptorSet(
     vsg::ref_ptr<vsg::PipelineLayout> pipelineLayout, const vsg::BindingMap& bindingMap)
 {

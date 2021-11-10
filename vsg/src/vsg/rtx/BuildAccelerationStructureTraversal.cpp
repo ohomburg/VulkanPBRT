@@ -47,8 +47,7 @@ void BuildAccelerationStructureTraversal::apply(vsg::Geometry& geometry)
         // create new blas and add to cache
         blas = BottomLevelAccelerationStructure::create(_device);
         auto accelGeom = AccelerationGeometry::create();
-        accelGeom->verts = geometry.arrays[0];
-        accelGeom->indices = geometry.indices;
+        accelGeom->geometry = AccelerationGeometry::Triangles{geometry.arrays[0], geometry.indices};
         blas->geometries.push_back(accelGeom);
     }
 
@@ -66,12 +65,19 @@ void BuildAccelerationStructureTraversal::apply(vsg::VertexIndexDraw& vid)
     {
         blas = BottomLevelAccelerationStructure::create(_device);
         auto accelGeom = AccelerationGeometry::create();
-        accelGeom->verts = vid.arrays[0];
-        accelGeom->indices = vid.indices;
+        accelGeom->geometry = AccelerationGeometry::Triangles{vid.arrays[0], vid.indices};
         blas->geometries.push_back(accelGeom);
     }
 
     // create a geometry instance for this geometry using the blas that represents it and the current transform matrix
+    createGeometryInstance(blas);
+}
+
+void BuildAccelerationStructureTraversal::apply(Volumetric &vol)
+{
+    auto blas = BottomLevelAccelerationStructure::create(_device);
+    auto geo = AccelerationGeometry::create();
+    geo->geometry = AccelerationGeometry::AABBs{Array<VkAabbPositionsKHR>::create({vol.box})};
     createGeometryInstance(blas);
 }
 

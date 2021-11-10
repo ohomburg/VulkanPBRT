@@ -10,6 +10,7 @@
 
 #include <vsgXchange/models.h>
 #include <vsgXchange/images.h>
+#include <vsgXchange/volumes.h>
 #include <vsg/all.h>
 
 #include <set>
@@ -208,7 +209,7 @@ int main(int argc, char** argv){
         guiValues->height = windowTraits->height;
 
     	// load scene
-        auto options = vsg::Options::create(vsgXchange::assimp::create(), vsgXchange::dds::create(), vsgXchange::stbi::create()); //using the assimp loader
+        auto options = vsg::Options::create(vsgXchange::assimp::create(), vsgXchange::dds::create(), vsgXchange::stbi::create(), vsgXchange::xyz::create()); //using the assimp loader
         loaded_scene = vsg::read_cast<vsg::Node>(filename, options);
         if(!loaded_scene){
             std::cout << "Scene not found: " << filename << std::endl;

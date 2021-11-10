@@ -31,52 +31,88 @@ AccelerationGeometry::AccelerationGeometry(Allocator* allocator) :
 
 void AccelerationGeometry::compile(Context& context)
 {
-    if (!verts) return;                                                                     // no data set
-    if (_geometry.geometry.triangles.vertexData.deviceAddress != VkDeviceAddress{0}) return;    // already compiled
+    if (std::holds_alternative<std::monostate>(geometry)) return; // no data set
+    // check already compiled
+    if (std::holds_alternative<CompiledTriangles>(_compiled) && _geometry.geometry.triangles.vertexData.deviceAddress != 0) return;
+    if (std::holds_alternative<CompiledAABBs>(_compiled) && _geometry.geometry.aabbs.data.deviceAddress != 0) return;
 
-    uint32_t vertcount = static_cast<uint32_t>(verts->valueCount());
-    uint32_t strideSize = static_cast<uint32_t>(verts->valueSize());
+    if (auto tris = std::get_if<Triangles>(&geometry))
+    {
+        auto vertcount = static_cast<uint32_t>(tris->verts->valueCount());
+        auto strideSize = static_cast<uint32_t>(tris->verts->valueSize());
 
-    DataList vertexDataList;
-    vertexDataList.push_back(verts);
+        DataList vertexDataList;
+        vertexDataList.push_back(tris->verts);
 
-    DataList indexDataList;
-    indexDataList.push_back(indices);
+        DataList indexDataList;
+        indexDataList.push_back(tris->indices);
 
 #if TRANSFER_BUFFERS
-    auto vertexBufferInfo = vsg::createBufferAndTransferData(context, vertexDataList, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR., VK_SHARING_MODE_EXCLUSIVE);
-    auto indexBufferInfo = vsg::createBufferAndTransferData(context, indexDataList, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
+        auto vertexBufferInfo = vsg::createBufferAndTransferData(context, vertexDataList, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
+        auto indexBufferInfo = vsg::createBufferAndTransferData(context, indexDataList, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
 #else
-    auto vertexBufferInfo = vsg::createHostVisibleBuffer(context.device, vertexDataList, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
-    vsg::copyDataListToBuffers(context.device, vertexBufferInfo);
-    auto indexBufferInfo = vsg::createHostVisibleBuffer(context.device, indexDataList, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
-    vsg::copyDataListToBuffers(context.device, indexBufferInfo);
+        auto vertexBufferInfo = vsg::createHostVisibleBuffer(context.device, vertexDataList, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
+        vsg::copyDataListToBuffers(context.device, vertexBufferInfo);
+        auto indexBufferInfo = vsg::createHostVisibleBuffer(context.device, indexDataList, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
+        vsg::copyDataListToBuffers(context.device, indexBufferInfo);
 #endif
 
-    _vertexBuffer = vertexBufferInfo[0];
-    _indexBuffer = indexBufferInfo[0];
+        CompiledTriangles compiled;
+        compiled._vertexBuffer = vertexBufferInfo[0];
+        compiled._indexBuffer = indexBufferInfo[0];
 
-    // create the VkGeometry
-    Extensions* extensions = Extensions::Get(context.device.get(), true);
-    VkDeviceOrHostAddressConstKHR vertexDataDeviceAddress{};
-    VkDeviceOrHostAddressConstKHR indexDataDeviceAddress{};
-    VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
-    bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-    bufferDeviceAI.buffer = _vertexBuffer.buffer->vk(context.deviceID);
-    vertexDataDeviceAddress.deviceAddress = extensions->vkGetBufferDeviceAddressKHR(*context.device, &bufferDeviceAI);
-    bufferDeviceAI.buffer = _indexBuffer.buffer->vk(context.deviceID);
-    indexDataDeviceAddress.deviceAddress = extensions->vkGetBufferDeviceAddressKHR(*context.device, &bufferDeviceAI);
+        // create the VkGeometry
+        Extensions* extensions = Extensions::Get(context.device.get(), true);
+        VkDeviceOrHostAddressConstKHR vertexDataDeviceAddress{};
+        VkDeviceOrHostAddressConstKHR indexDataDeviceAddress{};
+        VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
+        bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        bufferDeviceAI.buffer = compiled._vertexBuffer.buffer->vk(context.deviceID);
+        vertexDataDeviceAddress.deviceAddress = extensions->vkGetBufferDeviceAddressKHR(*context.device, &bufferDeviceAI);
+        bufferDeviceAI.buffer = compiled._indexBuffer.buffer->vk(context.deviceID);
+        indexDataDeviceAddress.deviceAddress = extensions->vkGetBufferDeviceAddressKHR(*context.device, &bufferDeviceAI);
 
-    _geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    _geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    _geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-    _geometry.geometry.triangles.vertexData = vertexDataDeviceAddress;
-    _geometry.geometry.triangles.maxVertex = vertcount;
-    _geometry.geometry.triangles.vertexStride = strideSize;
-    _geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-    _geometry.geometry.triangles.indexData = indexDataDeviceAddress;
-    _geometry.geometry.triangles.indexType = computeIndexType(indices);
-    _geometry.geometry.triangles.pNext = nullptr;
-    _geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-    _geometry.pNext = nullptr;
+        _geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        _geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+        _geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+        _geometry.geometry.triangles.vertexData = vertexDataDeviceAddress;
+        _geometry.geometry.triangles.maxVertex = vertcount;
+        _geometry.geometry.triangles.vertexStride = strideSize;
+        _geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+        _geometry.geometry.triangles.indexData = indexDataDeviceAddress;
+        _geometry.geometry.triangles.indexType = computeIndexType(tris->indices);
+        _geometry.geometry.triangles.pNext = nullptr;
+        _geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        _geometry.pNext = nullptr;
+    }
+    if (auto aabbs = std::get_if<AABBs>(&geometry))
+    {
+        auto stride = aabbs->boxes->stride();
+
+        DataList dataList{aabbs->boxes};
+
+        auto bufferInfo = vsg::createHostVisibleBuffer(context.device, dataList, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, VK_SHARING_MODE_EXCLUSIVE);
+        vsg::copyDataListToBuffers(context.device, bufferInfo);
+
+        CompiledAABBs compiled;
+        compiled._aabbBuffer = bufferInfo[0];
+
+        // create the VkGeometry
+        Extensions* extensions = Extensions::Get(context.device.get(), true);
+        VkDeviceOrHostAddressConstKHR dataDeviceAddress{};
+        VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
+        bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        bufferDeviceAI.buffer = compiled._aabbBuffer.buffer->vk(context.deviceID);
+        dataDeviceAddress.deviceAddress = extensions->vkGetBufferDeviceAddressKHR(*context.device, &bufferDeviceAI);
+
+        _geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        _geometry.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
+        _geometry.geometry.aabbs.data = dataDeviceAddress;
+        _geometry.geometry.aabbs.pNext = nullptr;
+        _geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
+        _geometry.geometry.aabbs.stride = stride;
+        _geometry.flags = 0;
+        _geometry.pNext = nullptr;
+    }
+
 }

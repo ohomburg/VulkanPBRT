@@ -20,6 +20,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <vsg/nodes/Geometry.h>
 #include <vsg/nodes/MatrixTransform.h>
 #include <vsg/nodes/VertexIndexDraw.h>
+#include <vsg/nodes/Volumetric.h>
 
 #include <vsg/rtx/AccelerationStructure.h>
 #include <vsg/rtx/BottomLevelAccelerationStructure.h>
@@ -37,6 +38,7 @@ namespace vsg
         void apply(MatrixTransform& mt);
         void apply(vsg::Geometry& geometry);
         void apply(vsg::VertexIndexDraw& vid);
+        void apply(vsg::Volumetric& vol);
 
         // the top level acceleration structure we are creating and adding geometry instances to as we find and create them
         ref_ptr<TopLevelAccelerationStructure> tlas;

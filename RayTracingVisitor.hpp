@@ -26,6 +26,9 @@ public:
     //getting the lights in the scene
     void apply(const vsg::Light& l);
 
+    //uploading volume data
+    void apply(vsg::Volumetric& vol);
+
     vsg::ref_ptr<vsg::BindDescriptorSet> getBindDescriptorSet(vsg::ref_ptr<vsg::PipelineLayout> pipelineLayout,
                                                               const vsg::BindingMap& bindingMap);;
 
@@ -82,6 +85,7 @@ protected:
     std::vector<vsg::ref_ptr<vsg::DescriptorImage>> _normal;
     std::vector<vsg::ref_ptr<vsg::DescriptorImage>> _emissive;
     std::vector<vsg::ref_ptr<vsg::DescriptorImage>> _specular;
+    std::vector<vsg::ref_ptr<vsg::DescriptorImage>> _volume;
     //buffers are available for each geometry
     std::vector<vsg::ref_ptr<vsg::DescriptorBuffer>> _positions;
     std::vector<vsg::ref_ptr<vsg::DescriptorBuffer>> _normals;

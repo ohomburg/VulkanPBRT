@@ -39,7 +39,14 @@ void BottomLevelAccelerationStructure::compile(Context& context)
 
     // set the additional acceleration structure info used in the base AccelerationStructure compile function
     for (const auto& geom : geometries){
-        _geometryPrimitiveCounts.push_back(geom->indices->valueCount() / 3);
+        if (auto tris = std::get_if<AccelerationGeometry::Triangles>(&geom->geometry))
+        {
+            _geometryPrimitiveCounts.push_back(tris->indices->valueCount() / 3);
+        }
+        else if (auto aabbs = std::get_if<AccelerationGeometry::AABBs>(&geom->geometry))
+        {
+            _geometryPrimitiveCounts.push_back(aabbs->boxes->valueCount());
+        }
     }
     _accelerationStructureBuildGeometryInfo.geometryCount = static_cast<uint32_t>(geometries.size());
     _accelerationStructureBuildGeometryInfo.pGeometries = _vkGeometries.data();

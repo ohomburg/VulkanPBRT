@@ -18,6 +18,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <vsg/state/BufferInfo.h>
 #include <vsg/state/Descriptor.h>
 #include <vsg/vk/DeviceMemory.h>
+#include <variant>
 
 namespace vsg
 {
@@ -31,13 +32,33 @@ namespace vsg
 
         operator VkAccelerationStructureGeometryKHR() const { return _geometry; }
 
-        ref_ptr<Data> verts;
-        ref_ptr<Data> indices;
+        struct Triangles
+        {
+            ref_ptr<Data> verts;
+            ref_ptr<Data> indices;
+        };
+        struct AABBs
+        {
+            ref_ptr<Data> boxes;
+        };
+
+        std::variant<std::monostate, Triangles, AABBs> geometry;
 
     protected:
         // compiled data
-        BufferInfo _vertexBuffer;
-        BufferInfo _indexBuffer;
+        struct CompiledTriangles
+        {
+            BufferInfo _vertexBuffer;
+            BufferInfo _indexBuffer;
+        };
+
+        struct CompiledAABBs
+        {
+            BufferInfo _aabbBuffer;
+        };
+
+        std::variant<CompiledTriangles, CompiledAABBs> _compiled;
+
         VkAccelerationStructureGeometryKHR _geometry;
     };
 
