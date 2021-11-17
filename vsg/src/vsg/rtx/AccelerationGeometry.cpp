@@ -84,6 +84,8 @@ void AccelerationGeometry::compile(Context& context)
         _geometry.geometry.triangles.pNext = nullptr;
         _geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
         _geometry.pNext = nullptr;
+
+        _compiled = compiled;
     }
     if (auto aabbs = std::get_if<AABBs>(&geometry))
     {
@@ -113,6 +115,8 @@ void AccelerationGeometry::compile(Context& context)
         _geometry.geometry.aabbs.stride = stride;
         _geometry.flags = 0;
         _geometry.pNext = nullptr;
+
+        _compiled = compiled;
     }
 
 }
