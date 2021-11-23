@@ -333,7 +333,7 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::Volumetric& vol)
     auto sampler = vsg::Sampler::create();
     auto image = vol.voxels;
 
-    auto desc = vsg::DescriptorImage::create(sampler, image, 15, _volume.size());
+    auto desc = vsg::DescriptorImage::create(sampler, image, 30, _volume.size());
     _volume.push_back(desc);
     isOpaque.push_back(true);
 }
@@ -404,6 +404,9 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
         int specularInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "specularMap").second;
         std::find_if(bindings.begin(), bindings.end(), [&](VkDescriptorSetLayoutBinding& b) { return b.binding == specularInd; })->
             descriptorCount = static_cast<uint32_t>(_specular.size());
+        int volumeInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "gridImage").second;
+        std::find_if(bindings.begin(), bindings.end(), [&](VkDescriptorSetLayoutBinding& b) { return b.binding == volumeInd; })->
+                descriptorCount = std::max(static_cast<uint32_t>(_volume.size()), 1u);
         int lightInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Lights").second;
         int matInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Materials").second;
         int instancesInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Instances").second;
@@ -433,6 +436,18 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
         for (auto& d : _specular)
         {
             d->dstBinding = specularInd;
+            descList.push_back(d);
+        }
+        for (auto& d : _volume)
+        {
+            d->dstBinding = volumeInd;
+            descList.push_back(d);
+        }
+        if (_volume.empty())
+        {
+            // HACK: make the descriptor stats count one extra so we can allocate in peace.
+            // TODO: fix validation (shader needs 3d image not 2d)
+            auto d = vsg::DescriptorImage::create(_defaultTexture->imageInfoList, 30, 0);
             descList.push_back(d);
         }
         _lights->dstBinding = lightInd;

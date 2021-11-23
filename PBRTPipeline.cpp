@@ -80,13 +80,17 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
     std::string shadowMissPath = "shaders/shadow.rmiss.spv";
     std::string closesthitPath = "shaders/pbr_closesthit.rchit.spv";
     std::string anyHitPath = "shaders/alpha_hit.rahit.spv";
+    std::string cloudHitPath = "shaders/cloud.rchit.spv";
+    std::string cloudIntPath = "shaders/cloud.rint.spv";
 
     auto raygenShader = setupRaygenShader(raygenPath, useExternalGbuffer);
     auto raymissShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_MISS_BIT_KHR, "main", raymissPath);
     auto shadowMissShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_MISS_BIT_KHR, "main", shadowMissPath);
     auto closesthitShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, "main", closesthitPath);
     auto anyHitShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_ANY_HIT_BIT_KHR, "main", anyHitPath);
-    if (!raygenShader || !raymissShader || !closesthitShader || !shadowMissShader || !anyHitShader)
+    auto cloudHitShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, "main", cloudHitPath);
+    auto cloudIntShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_INTERSECTION_BIT_KHR, "main", cloudIntPath);
+    if (!raygenShader || !raymissShader || !closesthitShader || !shadowMissShader || !anyHitShader || !cloudHitShader || !cloudIntShader)
     {
         throw vsg::Exception{"Error: PBRTPipeline::PBRTPipeline(...) failed to create shader stages."};
     }
@@ -95,13 +99,15 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
          raymissShader->getDescriptorSetLayoutBindingsMap(),
          shadowMissShader->getDescriptorSetLayoutBindingsMap(),
          closesthitShader->getDescriptorSetLayoutBindingsMap(),
-         anyHitShader->getDescriptorSetLayoutBindingsMap()});
+         anyHitShader->getDescriptorSetLayoutBindingsMap(),
+         cloudHitShader->getDescriptorSetLayoutBindingsMap(),
+         cloudIntShader->getDescriptorSetLayoutBindingsMap()});
 
     auto descriptorSetLayout = vsg::DescriptorSetLayout::create(bindingMap.begin()->second.bindings);
     // auto rayTracingPipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{descriptorSetLayout}, vsg::PushConstantRanges{{VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(RayTracingPushConstants)}});
     auto rayTracingPipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{descriptorSetLayout},
                                                                 raygenShader->getPushConstantRanges());
-    auto shaderStage = vsg::ShaderStages{raygenShader, raymissShader, shadowMissShader, closesthitShader, anyHitShader};
+    auto shaderStage = vsg::ShaderStages{raygenShader, raymissShader, shadowMissShader, closesthitShader, anyHitShader, cloudHitShader, cloudIntShader};
     auto raygenShaderGroup = vsg::RayTracingShaderGroup::create();
     raygenShaderGroup->type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
     raygenShaderGroup->generalShader = 0;
@@ -118,12 +124,17 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
     transparenthitShaderGroup->type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
     transparenthitShaderGroup->closestHitShader = 3;
     transparenthitShaderGroup->anyHitShader = 4;
+    auto cloudShaderGroup = vsg::RayTracingShaderGroup::create();
+    cloudShaderGroup->type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
+    cloudShaderGroup->intersectionShader = 6;
+    cloudShaderGroup->closestHitShader = 5;
+
     auto shaderGroups = vsg::RayTracingShaderGroups{
-        raygenShaderGroup, raymissShaderGroup, shadowMissShaderGroup, closesthitShaderGroup, transparenthitShaderGroup};
+        raygenShaderGroup, raymissShaderGroup, shadowMissShaderGroup, closesthitShaderGroup, transparenthitShaderGroup, cloudShaderGroup};
     shaderBindingTable = vsg::RayTracingShaderBindingTable::create();
     shaderBindingTable->bindingTableEntries.raygenGroups = {raygenShaderGroup};
     shaderBindingTable->bindingTableEntries.raymissGroups = {raymissShaderGroup, shadowMissShaderGroup};
-    shaderBindingTable->bindingTableEntries.hitGroups = {closesthitShaderGroup, transparenthitShaderGroup};
+    shaderBindingTable->bindingTableEntries.hitGroups = {closesthitShaderGroup, transparenthitShaderGroup, cloudShaderGroup};
     auto pipeline = vsg::RayTracingPipeline::create(rayTracingPipelineLayout, shaderStage, shaderGroups, shaderBindingTable,
                                                     2 * maxRecursionDepth);
     bindRayTracingPipeline = vsg::BindRayTracingPipeline::create(pipeline);

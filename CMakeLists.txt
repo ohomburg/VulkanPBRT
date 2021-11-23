@@ -48,6 +48,8 @@ set(SHADERS
     bmfrFitLegacy.comp
     bmfrPost.comp
     accumulator.comp
+    cloud.rchit
+    cloud.rint
 )
 
 set(UNCOMPILED_SHADERS
