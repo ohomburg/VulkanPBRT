@@ -34,8 +34,8 @@ public:
 
     //holds the binding command for the raytracing decriptor
     std::vector<vsg::Light::PackedLight> packedLights;
-    //holds information about each geometry if it is opaque
-    std::vector<bool> isOpaque;
+    //holds information about each geometry if it is opaque, non-opaque or volumetric
+    std::vector<uint32_t> geometryType;
 protected:
     struct ObjectInstance{
         vsg::mat4 objectMat;

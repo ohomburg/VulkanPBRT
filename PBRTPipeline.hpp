@@ -31,7 +31,7 @@ private:
     void setupPipeline(vsg::Node* scene, bool useExternalGBuffer);
     vsg::ref_ptr<vsg::ShaderStage> setupRaygenShader(std::string raygenPath, bool useExternalGBuffer);
 
-    std::vector<bool> opaqueGeometries;
+    std::vector<uint32_t> geometryTypes;
     uint32_t width, height, maxRecursionDepth, samplePerPixel;
 
     // TODO: add buffers here

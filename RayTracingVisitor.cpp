@@ -189,7 +189,7 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::BindDescriptorSet& bds
 {
     // TODO: every material that is not set should get a default material assigned
     std::set<int> setTextures;
-    isOpaque.push_back(true);
+    geometryType.push_back(0);
     for (const auto& descriptor : bds.descriptorSet->descriptors)
     {
         if (descriptor->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) //pbr material
@@ -248,17 +248,17 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::BindDescriptorSet& bds
             {
                 auto data = d->imageInfoList[0].imageView->image->data;
                 //int amt = data->dataSize() / data->stride();
-                for (int i = 0; i < data->dataSize() / data->stride() && isOpaque.back(); ++i)
+                for (int i = 0; i < data->dataSize() / data->stride() && geometryType.back() == 0; ++i)
                 {
                     void* d = static_cast<char*>(data->dataPointer()) + i * data->stride();
                     switch (data->getLayout().format)
                     {
                     case VK_FORMAT_R32G32B32A32_SFLOAT:
-                        if (static_cast<float*>(d)[3] < .01f) isOpaque.back() = false;
+                        if (static_cast<float*>(d)[3] < .01f) geometryType.back() = 1;
                         break;
                     case VK_FORMAT_R8G8B8A8_UNORM:
                     case VK_FORMAT_B8G8R8A8_UNORM:
-                        if (static_cast<uint8_t*>(d)[3] < .01f * 255) isOpaque.back() = false;
+                        if (static_cast<uint8_t*>(d)[3] < .01f * 255) geometryType.back() = 1;
                         break;
                     }
                 }
@@ -335,7 +335,7 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::Volumetric& vol)
 
     auto desc = vsg::DescriptorImage::create(sampler, image, 30, _volume.size());
     _volume.push_back(desc);
-    isOpaque.push_back(true);
+    geometryType.push_back(2);
 }
 vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::getBindDescriptorSet(
     vsg::ref_ptr<vsg::PipelineLayout> pipelineLayout, const vsg::BindingMap& bindingMap)

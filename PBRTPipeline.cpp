@@ -37,12 +37,14 @@ void PBRTPipeline::setTlas(vsg::ref_ptr<vsg::AccelerationStructure> as)
 {
     auto tlas = as.cast<vsg::TopLevelAccelerationStructure>();
     assert(tlas);
+    uint32_t triangleBlasCount = 0, aabbBlasCount = 0;
     for (int i = 0; i < tlas->geometryInstances.size(); ++i)
     {
-        if (opaqueGeometries[i])
-            tlas->geometryInstances[i]->shaderOffset = 0;
-        else
-            tlas->geometryInstances[i]->shaderOffset = 1;
+        // remap indices for volumetric instances separately
+        bool isTriangles = geometryTypes[i] < 2;
+        uint32_t& count = isTriangles ? triangleBlasCount : aabbBlasCount;
+        tlas->geometryInstances[i]->id = count++;
+        tlas->geometryInstances[i]->shaderOffset = geometryTypes[i];
         tlas->geometryInstances[i]->geometryFlags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
     }
     auto accelDescriptor = vsg::DescriptorAccelerationStructure::create(vsg::AccelerationStructures{as}, 0, 0);
@@ -143,7 +145,7 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
     RayTracingSceneDescriptorCreationVisitor buildDescriptorBinding;
     scene->accept(buildDescriptorBinding);
     bindRayTracingDescriptorSet = buildDescriptorBinding.getBindDescriptorSet(rayTracingPipelineLayout, bindingMap);
-    opaqueGeometries = buildDescriptorBinding.isOpaque;
+    geometryTypes = buildDescriptorBinding.geometryType;
 
     // creating the constant infos uniform buffer object
     auto constantInfos = ConstantInfosValue::create();
