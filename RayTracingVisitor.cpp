@@ -15,6 +15,8 @@ RayTracingSceneDescriptorCreationVisitor::RayTracingSceneDescriptorCreationVisit
     image.sampler->anisotropyEnable = VK_FALSE;
     image.sampler->maxLod = 1;
     _defaultTexture = vsg::DescriptorImage::create(image);
+    _dummyBuffer = vsg::floatArray::create(1, 0.0f);
+    _dummyVolume = vsg::floatArray3D::create(1,1,1, 0.0f, vsg::Data::Layout{ VK_FORMAT_R32_SFLOAT });
 }
 void RayTracingSceneDescriptorCreationVisitor::apply(vsg::Object& object)
 {
@@ -358,22 +360,39 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
         }
         if (!_lights)
         {
-            auto lights = vsg::Array<vsg::Light::PackedLight>::create(packedLights.size());
+            auto lights = vsg::Array<vsg::Light::PackedLight>::create(std::max(packedLights.size(), size_t(1)));
             std::copy(packedLights.begin(), packedLights.end(), lights->data());
             _lights = vsg::DescriptorBuffer::create(lights, 12, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         }
         if (!_materials)
         {
-            auto materials = vsg::Array<WaveFrontMaterialPacked>::create(_materialArray.size());
+            auto materials = vsg::Array<WaveFrontMaterialPacked>::create(std::max(_materialArray.size(), size_t(1)));
             std::copy(_materialArray.begin(), _materialArray.end(), materials->data());
             _materials = vsg::DescriptorBuffer::create(materials, 13, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         }
         if (!_instances)
         {
-            auto instances = vsg::Array<ObjectInstance>::create(_instancesArray.size());
+            auto instances = vsg::Array<ObjectInstance>::create(std::max(_instancesArray.size(), size_t(1)));
             std::copy(_instancesArray.begin(), _instancesArray.end(), instances->data());
             _instances = vsg::DescriptorBuffer::create(instances, 14, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         }
+
+        // TODO: handle empty binding arrays - currently cause descriptorCount to be set to 0, which is illegal if they
+        //       are referenced in the shader. Should set to 1 and include the dummy texture descriptor.
+
+        if (_diffuse.empty()) _diffuse.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
+        if (_mr.empty()) _mr.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
+        if (_normal.empty()) _normal.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
+        if (_emissive.empty()) _emissive.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
+        if (_specular.empty()) _specular.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
+
+        if (_positions.empty()) _positions.push_back(vsg::DescriptorBuffer::create(_dummyBuffer, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+        if (_normals.empty()) _normals.push_back(vsg::DescriptorBuffer::create(_dummyBuffer, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+        if (_texCoords.empty()) _texCoords.push_back(vsg::DescriptorBuffer::create(_dummyBuffer, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+        if (_indices.empty()) _indices.push_back(vsg::DescriptorBuffer::create(_dummyBuffer, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+
+        auto dummyVoxelSampler = vsg::Sampler::create();
+        if (_volume.empty()) _volume.push_back(vsg::DescriptorImage::create(dummyVoxelSampler, _dummyVolume));
 
         // setting the descriptor amount for the object arrays
         vsg::DescriptorSetLayoutBindings& bindings = pipelineLayout->setLayouts[0]->bindings;
@@ -406,7 +425,7 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
             descriptorCount = static_cast<uint32_t>(_specular.size());
         int volumeInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "gridImage").second;
         std::find_if(bindings.begin(), bindings.end(), [&](VkDescriptorSetLayoutBinding& b) { return b.binding == volumeInd; })->
-                descriptorCount = std::max(static_cast<uint32_t>(_volume.size()), 1u);
+                descriptorCount = static_cast<uint32_t>(_volume.size());
         int lightInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Lights").second;
         int matInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Materials").second;
         int instancesInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Instances").second;
@@ -441,13 +460,6 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
         for (auto& d : _volume)
         {
             d->dstBinding = volumeInd;
-            descList.push_back(d);
-        }
-        if (_volume.empty())
-        {
-            // HACK: make the descriptor stats count one extra so we can allocate in peace.
-            // TODO: fix validation (shader needs 3d image not 2d)
-            auto d = vsg::DescriptorImage::create(_defaultTexture->imageInfoList, 30, 0);
             descList.push_back(d);
         }
         _lights->dstBinding = lightInd;

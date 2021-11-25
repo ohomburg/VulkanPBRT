@@ -99,6 +99,7 @@ protected:
     vsg::MatrixStack _transformStack;
 
     vsg::ref_ptr<vsg::DescriptorImage> _defaultTexture;   //the default image is used for each texture that is not available
+    vsg::ref_ptr<vsg::Data> _dummyBuffer, _dummyVolume;
     bool firstStageGroup = true;                        //the first state group contains the default state which should be skipped
     bool meshEmissive = false;                          //set to true by a descriptor set that has emission
 };
