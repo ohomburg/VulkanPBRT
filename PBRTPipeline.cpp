@@ -9,6 +9,8 @@ namespace
         uint32_t lightCount;
         uint32_t minRecursionDepth;
         uint32_t maxRecursionDepth;
+        vsg::vec4 extinction, scattering;
+        vsg::vec4 sunDirection, sunColor;
     };
 
     class ConstantInfosValue : public vsg::Inherit<vsg::Value<ConstantInfos>, ConstantInfosValue>
@@ -151,6 +153,10 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
     auto constantInfos = ConstantInfosValue::create();
     constantInfos->value().lightCount = buildDescriptorBinding.packedLights.size();
     constantInfos->value().maxRecursionDepth = maxRecursionDepth;
+    constantInfos->value().extinction = vsg::vec4(1024, 1024, 1024, 0);
+    constantInfos->value().scattering = vsg::vec4(1, 1, 1, 0);
+    constantInfos->value().sunDirection = vsg::normalize(vsg::vec4(0.5826, 0.7660, 0.2717, 0));
+    constantInfos->value().sunColor = vsg::vec4(2.6, 2.5, 2.3, 0);
     uint32_t uniformBufferBinding = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Infos").second;
     auto constantInfosDescriptor = vsg::DescriptorBuffer::create(constantInfos, uniformBufferBinding, 0);
     bindRayTracingDescriptorSet->descriptorSet->descriptors.push_back(constantInfosDescriptor);

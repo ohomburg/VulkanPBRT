@@ -74,12 +74,17 @@ vsg::ref_ptr<vsg::Object> xyz::read(std::istream& fin, vsg::ref_ptr<const vsg::O
         d *= rcpMaxVal;
     }
 
+    auto container = vsg::MatrixTransform::create();
     auto vol = vsg::Volumetric::create();
     vol->voxels = data;
     vol->box.minX = vol->box.minY = vol->box.minZ = 0;
-    vol->box.maxX = static_cast<float>(voxelSizeX * sizeX);
-    vol->box.maxY = static_cast<float>(voxelSizeY * sizeY);
-    vol->box.maxZ = static_cast<float>(voxelSizeZ * sizeZ);
+    vol->box.maxX = vol->box.maxY = vol->box.maxZ = 1.0f;
 
-    return vol;
+    auto& mat = container->getMatrix();
+    mat(0, 0) = static_cast<float>(voxelSizeX * sizeX);
+    mat(1, 1) = static_cast<float>(voxelSizeY * sizeY);
+    mat(2, 2) = static_cast<float>(voxelSizeZ * sizeZ);
+
+    container->addChild(vol);
+    return container;
 }

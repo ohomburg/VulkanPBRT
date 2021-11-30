@@ -377,9 +377,6 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
             _instances = vsg::DescriptorBuffer::create(instances, 14, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         }
 
-        // TODO: handle empty binding arrays - currently cause descriptorCount to be set to 0, which is illegal if they
-        //       are referenced in the shader. Should set to 1 and include the dummy texture descriptor.
-
         if (_diffuse.empty()) _diffuse.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
         if (_mr.empty()) _mr.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
         if (_normal.empty()) _normal.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));

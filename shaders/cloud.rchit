@@ -14,23 +14,16 @@ layout(binding = 26) uniform Infos{
     uint minRecursionDepth;
     uint maxRecursionDepth;
 
-    // TODO: determine where to actuall put this info
-
-    // Transform from Projection space to world space
-    mat4 proj2world;
-
     // Cloud properties
-    vec3 box_minim;
-    vec3 box_maxim;
-
     vec3 extinction;
     vec3 scatteringAlbedo;
-    float phaseG;
 
     // Sky properties
     vec3 sun_direction;
     vec3 sun_intensity;
 } parameters;
+
+const float phaseG = 0.857;
 
 /*
 Taken from https://github.com/lleonart1984/vulkansimplecloudrendering
@@ -123,7 +116,7 @@ vec3 sampleLight(in vec3 dir){
 float sampleCloud(in vec3 pos)
 {
     ivec3 dim = textureSize(gridImage[gl_InstanceCustomIndexEXT], 0);
-    vec3 coord = (pos - parameters.box_minim)/(parameters.box_maxim - parameters.box_minim);
+    vec3 coord = pos;
     coord += vec3(randomFloat(rayPayload.re) - 0.5, randomFloat(rayPayload.re) - 0.5, randomFloat(rayPayload.re) - 0.5)/ dim;
     return texture(gridImage[gl_InstanceCustomIndexEXT], coord).x;
 }
@@ -205,7 +198,7 @@ vec3 PathtraceSpectral(vec3 x, vec3 w)
     float PS = maxComponent (scatteringAlbedo * parameters.extinction);
 
     float tMin, tMax;
-    if (rayBoxIntersect(parameters.box_minim, parameters.box_maxim, x, w, tMin, tMax))
+    if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
     {
         x += w * tMin;
         float d = tMax - tMin;
@@ -239,8 +232,8 @@ vec3 PathtraceSpectral(vec3 x, vec3 w)
             if (xi < 1 - Pn) // scattering event
             {
                 float pdf_w;
-                w = ImportanceSamplePhase(parameters.phaseG, w, pdf_w);
-                if (rayBoxIntersect(parameters.box_minim, parameters.box_maxim, x, w, tMin, tMax))
+                w = ImportanceSamplePhase(phaseG, w, pdf_w);
+                if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
                 {
                     x += w*tMin;
                     d = tMax - tMin;
@@ -268,7 +261,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
     float PS = scatteringAlbedo * parameters.extinction.x;
 
     float tMin, tMax;
-    if (rayBoxIntersect(parameters.box_minim, parameters.box_maxim, x, w, tMin, tMax))
+    if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
     {
         x += w * tMin;
         float d = tMax - tMin;
@@ -301,7 +294,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
             if (xi < 1 - Pn) // scattering event
             {
                 float pdf_w;
-                w = ImportanceSamplePhase(parameters.phaseG, w, pdf_w);
+                w = ImportanceSamplePhase(phaseG, w, pdf_w);
 
                 if (!first_event.hasValue) {
                     first_event.x = x;
@@ -311,7 +304,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
                     first_event.hasValue = true;
                 }
 
-                if (rayBoxIntersect(parameters.box_minim, parameters.box_maxim, x, w, tMin, tMax))
+                if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
                 {
                     x += w*tMin;
                     d = tMax - tMin;
@@ -337,7 +330,8 @@ void main()
     ScatterEvent first_event;
     vec3 result = Pathtrace(x, w, first_event);
 
-    // TODO: outputs
+    rayPayload.color = result;
+    // TODO: the rest of the outputs?
 }
 
 /*

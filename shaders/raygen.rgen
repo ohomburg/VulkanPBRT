@@ -46,7 +46,7 @@ layout(push_constant) uniform PushConstants
 
 layout(location = 1) rayPayloadEXT RayPayload rayPayload;
 
-uint rayFlags = gl_RayFlagsNoOpaqueEXT | gl_RayFlagsOpaqueEXT;
+uint rayFlags = 0;
 uint cullMask = 0xff;
 float tmin = 0.001;
 float tmax = 10000.0;
