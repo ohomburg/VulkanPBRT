@@ -78,6 +78,7 @@ void BuildAccelerationStructureTraversal::apply(Volumetric &vol)
     auto blas = BottomLevelAccelerationStructure::create(_device);
     auto geo = AccelerationGeometry::create();
     geo->geometry = AccelerationGeometry::AABBs{Array<VkAabbPositionsKHR>::create({vol.box})};
+    blas->geometries.push_back(geo);
     createGeometryInstance(blas);
 }
 

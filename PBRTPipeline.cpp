@@ -139,8 +139,7 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
     shaderBindingTable->bindingTableEntries.raygenGroups = {raygenShaderGroup};
     shaderBindingTable->bindingTableEntries.raymissGroups = {raymissShaderGroup, shadowMissShaderGroup};
     shaderBindingTable->bindingTableEntries.hitGroups = {closesthitShaderGroup, transparenthitShaderGroup, cloudShaderGroup};
-    auto pipeline = vsg::RayTracingPipeline::create(rayTracingPipelineLayout, shaderStage, shaderGroups, shaderBindingTable,
-                                                    2 * maxRecursionDepth);
+    auto pipeline = vsg::RayTracingPipeline::create(rayTracingPipelineLayout, shaderStage, shaderGroups, shaderBindingTable, 1);
     bindRayTracingPipeline = vsg::BindRayTracingPipeline::create(pipeline);
 
     // parsing data from scene
