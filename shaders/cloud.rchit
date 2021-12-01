@@ -3,7 +3,9 @@
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-#include "general.glsl"
+#include "ptStructures.glsl"
+#include "layoutPTAccel.glsl"
+#include "random.glsl"
 
 layout(location = 1) rayPayloadInEXT RayPayload rayPayload;
 layout(binding = 12) buffer Lights{Light l[]; } lights;
@@ -61,9 +63,9 @@ void CreateOrthonormalBasis(vec3 D, out vec3 B, out vec3 T) {
 	T = normalize(cross(D, B));
 }
 
-vec3 randomDirection(vec3 D) {
-	float r1 = randomFloat(rayPayload.re);
-	float r2 = randomFloat(rayPayload.re) * 2 - 1;
+vec3 randomDirection(vec3 D, inout RandomEngine re) {
+	float r1 = randomFloat(re);
+	float r2 = randomFloat(re) * 2 - 1;
 	float sqrR2 = r2 * r2;
 	float two_pi_by_r1 = two_pi * r1;
 	float sqrt_of_one_minus_sqrR2 = sqrt(1.0 - sqrR2);
@@ -86,14 +88,14 @@ float invertcdf(float GFactor, float xi) {
 	return one_over_2g * (one_plus_g2 - t * t);
 }
 
-vec3 ImportanceSamplePhase(float GFactor, vec3 D, out float pdf) {
+vec3 ImportanceSamplePhase(float GFactor, vec3 D, out float pdf, inout RandomEngine re) {
 	if (abs(GFactor) < 0.001) {
         pdf = 1.0 / (4 * pi);
-		return randomDirection(-D);
+		return randomDirection(-D, re);
 	}
 
-	float phi = randomFloat(rayPayload.re) * 2 * pi;
-	float cosTheta = invertcdf(GFactor, randomFloat(rayPayload.re));
+	float phi = randomFloat(re) * 2 * pi;
+	float cosTheta = invertcdf(GFactor, randomFloat(re));
 	float sinTheta = sqrt(max(0, 1.0f - cosTheta * cosTheta));
 
 	vec3 t0, t1;
@@ -113,12 +115,12 @@ vec3 sampleLight(in vec3 dir){
 	return parameters.sun_intensity * pow(max(0, dot(dir, parameters.sun_direction)), N) * phongNorm;
 }
 
-float sampleCloud(in vec3 pos)
+float sampleCloud(in vec3 pos, inout RandomEngine re)
 {
     ivec3 dim = textureSize(gridImage[gl_InstanceCustomIndexEXT], 0);
     vec3 coord = pos;
-    coord += vec3(randomFloat(rayPayload.re) - 0.5, randomFloat(rayPayload.re) - 0.5, randomFloat(rayPayload.re) - 0.5)/ dim;
-    return texture(gridImage[gl_InstanceCustomIndexEXT], coord).x;
+    coord += vec3(randomFloat(re) - 0.5, randomFloat(re) - 0.5, randomFloat(re) - 0.5)/ dim;
+    return textureLod(gridImage[gl_InstanceCustomIndexEXT], coord, 0).x;
 }
 
 bool rayBoxIntersect(vec3 bMin, vec3 bMax, vec3 P, vec3 D, out float tMin, out float tMax)
@@ -186,7 +188,7 @@ vec3 sampleSkybox(in vec3 dir)
 }
 
 // Pathtracing with Delta tracking and Spectral tracking
-vec3 PathtraceSpectral(vec3 x, vec3 w)
+vec3 PathtraceSpectral(vec3 x, vec3 w, inout RandomEngine re)
 {
     float majorant = maxComponent(parameters.extinction);
 
@@ -203,14 +205,14 @@ vec3 PathtraceSpectral(vec3 x, vec3 w)
         x += w * tMin;
         float d = tMax - tMin;
 	    while (true) {
-            float t = -log(max(0.0000000001, 1 - randomFloat(rayPayload.re)))/majorant;
+            float t = -log(max(0.0000000001, 1 - randomFloat(re)))/majorant;
 
             if (t > d)
                 break;
 
             x += w * t;
 
-            float density = sampleCloud(x);
+            float density = sampleCloud(x, re);
 
             vec3 sigma_a = absorptionAlbedo * parameters.extinction * density;
             vec3 sigma_s = scatteringAlbedo * parameters.extinction * density;
@@ -224,7 +226,7 @@ vec3 PathtraceSpectral(vec3 x, vec3 w)
             Ps /= C;
             Pn /= C;
 
-            float xi = randomFloat(rayPayload.re);
+            float xi = randomFloat(re);
 
             if (xi < Pa)
                 return vec3(0); // weights * sigma_a / (majorant * Pa) * L_e; // 0 - No emission
@@ -232,7 +234,7 @@ vec3 PathtraceSpectral(vec3 x, vec3 w)
             if (xi < 1 - Pn) // scattering event
             {
                 float pdf_w;
-                w = ImportanceSamplePhase(phaseG, w, pdf_w);
+                w = ImportanceSamplePhase(phaseG, w, pdf_w, re);
                 if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
                 {
                     x += w*tMin;
@@ -250,7 +252,7 @@ vec3 PathtraceSpectral(vec3 x, vec3 w)
     return min(weights, vec3(100000,100000,100000)) * ( sampleSkybox(w) + sampleLight(w) );
 }
 
-vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
+vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine re)
 {
     first_event = ScatterEvent( false, x, 0.0f, w, 0.0f );
 
@@ -269,14 +271,14 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
         float pdf_x = 1;
 
 	    while (true) {
-            float t = -log(max(0.0000000001, 1 - randomFloat(rayPayload.re)))/majorant;
+            float t = -log(max(0.0000000001, 1 - randomFloat(re)))/majorant;
 
             if (t > d)
                 break;
 
             x += w * t;
 
-            float density = sampleCloud(x);
+            float density = sampleCloud(x, re);
 
             float sigma_a = PA * density;
             float sigma_s = PS * density;
@@ -286,7 +288,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
             float Ps = sigma_s/majorant;
             float Pn = sigma_n/majorant;
 
-            float xi = randomFloat(rayPayload.re);
+            float xi = randomFloat(re);
 
             if (xi < Pa)
                 return vec3(0); // weights * sigma_a / (majorant * Pa) * L_e; // 0 - No emission
@@ -294,7 +296,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
             if (xi < 1 - Pn) // scattering event
             {
                 float pdf_w;
-                w = ImportanceSamplePhase(phaseG, w, pdf_w);
+                w = ImportanceSamplePhase(phaseG, w, pdf_w, re);
 
                 if (!first_event.hasValue) {
                     first_event.x = x;
@@ -322,16 +324,27 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event)
 
 void main()
 {
-    // TODO: double-check input mapping
-    vec3 x = gl_ObjectRayOriginEXT, w = gl_ObjectRayDirectionEXT;
-    x += w * gl_HitTEXT;
+    RandomEngine re = rEInit(gl_LaunchIDEXT.xy, 1); // TODO: frame counter
+
+    vec3 w = normalize(gl_ObjectRayDirectionEXT);
+    vec3 x = gl_ObjectRayOriginEXT + gl_ObjectRayDirectionEXT * gl_HitTEXT;
 
     // Perform a single path and get radiance
     ScatterEvent first_event;
-    vec3 result = Pathtrace(x, w, first_event);
+    vec3 result = Pathtrace(x, w, first_event, re);
 
-    rayPayload.color = result;
-    // TODO: the rest of the outputs?
+    rayPayload.position = x;
+    rayPayload.si.emissiveColor = result;
+
+    rayPayload.si.perceptualRoughness = 0;
+    rayPayload.si.metalness = 0;
+    rayPayload.si.alphaRoughness = 0;
+    rayPayload.si.reflectance0 = vec3(0);
+    rayPayload.si.reflectance90 = vec3(0);
+    rayPayload.si.diffuseColor = vec3(0);
+    rayPayload.si.specularColor = vec3(0);
+    rayPayload.si.normal = vec3(1);
+    rayPayload.si.basis = mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
 /*

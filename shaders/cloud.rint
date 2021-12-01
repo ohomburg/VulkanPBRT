@@ -22,8 +22,12 @@ void main()
 {
     // the corners are always (0,0,0) and (1,1,1)
     float tMin, tMax;
-    rayBoxIntersect(vec3(0,0,0), vec3(1,1,1), gl_ObjectRayOriginEXT, gl_ObjectRayDirectionEXT, tMin, tMax);
-    // assume there is a hit if this shader is called (API violation, but should at worst be a perf issue)
+    if (!rayBoxIntersect(vec3(0,0,0), vec3(1,1,1), gl_ObjectRayOriginEXT, gl_ObjectRayDirectionEXT, tMin, tMax))
+        return;
+
+    if (tMin > gl_RayTmaxEXT) return;
+    if (tMax < gl_RayTminEXT) return;
+
     float tHit = clamp(tMin, gl_RayTminEXT, gl_RayTmaxEXT);
     reportIntersectionEXT(tHit, 0);
 }
