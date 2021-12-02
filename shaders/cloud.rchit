@@ -6,6 +6,7 @@
 #include "ptStructures.glsl"
 #include "layoutPTAccel.glsl"
 #include "random.glsl"
+#include "layoutPTPushConstants.glsl"
 
 layout(location = 1) rayPayloadInEXT RayPayload rayPayload;
 layout(binding = 12) buffer Lights{Light l[]; } lights;
@@ -324,7 +325,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine 
 
 void main()
 {
-    RandomEngine re = rEInit(gl_LaunchIDEXT.xy, 1); // TODO: frame counter
+    RandomEngine re = rEInit(gl_LaunchIDEXT.xy, camParams.frameNumber);
 
     vec3 w = normalize(gl_ObjectRayDirectionEXT);
     vec3 x = gl_ObjectRayOriginEXT + gl_ObjectRayDirectionEXT * gl_HitTEXT;

@@ -109,8 +109,10 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
 
     auto descriptorSetLayout = vsg::DescriptorSetLayout::create(bindingMap.begin()->second.bindings);
     // auto rayTracingPipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{descriptorSetLayout}, vsg::PushConstantRanges{{VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(RayTracingPushConstants)}});
+    auto pushConstRanges = raygenShader->getPushConstantRanges();
+    for (auto &range : pushConstRanges) range.stageFlags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
     auto rayTracingPipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{descriptorSetLayout},
-                                                                raygenShader->getPushConstantRanges());
+                                                                pushConstRanges);
     auto shaderStage = vsg::ShaderStages{raygenShader, raymissShader, shadowMissShader, closesthitShader, anyHitShader, cloudHitShader, cloudIntShader};
     auto raygenShaderGroup = vsg::RayTracingShaderGroup::create();
     raygenShaderGroup->type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
