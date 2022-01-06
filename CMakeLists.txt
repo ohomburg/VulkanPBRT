@@ -46,6 +46,12 @@ set(SHADERS
     ptMiss.rmiss
     cloud.rchit
     cloud.rint
+    a-svgf/Atrous.comp
+    a-svgf/AtrousGradient.comp
+    a-svgf/CreateGradientSamples.comp
+    a-svgf/EstimateVariance.comp
+    #a-svgf/GradientForwardProject.fs
+    a-svgf/TemporalAccumulation.comp
 )
 
 set(UNCOMPILED_SHADERS

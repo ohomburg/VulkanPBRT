@@ -4,6 +4,7 @@
 
 #include "Denoiser/BFRBlender.hpp"
 #include "Denoiser/BMFR.hpp"
+#include "Denoiser/A_SVGF.hpp"
 #include "PipelineStructs.hpp"
 #include "CountTrianglesVisitor.hpp"
 #include "gui.hpp"
@@ -30,6 +31,7 @@ enum class DenoisingType{
     None,
     BMFR,
     BFR,
+    ASVGF,
     SVG
 };
 DenoisingType denoisingType = DenoisingType::None;
@@ -106,8 +108,9 @@ int main(int argc, char** argv){
         if(arguments.read("--denoiser", denoisingTypeStr)){
             if(denoisingTypeStr == "bmfr")     denoisingType = DenoisingType::BMFR;
             else if(denoisingTypeStr == "bfr") denoisingType = DenoisingType::BFR;
-            else if(denoisingTypeStr == "svgf")denoisingType = DenoisingType::SVG;
-            else if(denoisingTypeStr == "none"){}
+            else if(denoisingTypeStr == "asvgf") denoisingType = DenoisingType::ASVGF;
+            else if(denoisingTypeStr == "svgf") denoisingType = DenoisingType::SVG;
+            else if(denoisingTypeStr == "none") {}
             else std::cout << "Unknown denoising type: " << denoisingTypeStr << std::endl;
         }
         bool useTaa = arguments.read("--taa");
@@ -436,6 +439,13 @@ int main(int argc, char** argv){
                 break;
             }
             break;
+        case DenoisingType::ASVGF: {
+            auto a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer);
+            a_svgf->compile(imageLayoutCompile.context);
+            a_svgf->addDispatchToCommandGraph(commands);
+            finalDescriptorImage = a_svgf->getFinalDescriptorImage();
+            break;
+        }
         case DenoisingType::SVG:
             std::cout << "Not yet implemented" << std::endl;
             break;
