@@ -86,5 +86,6 @@ private:
     vsg::ref_ptr<vsg::BindDescriptorSet> bindDescriptorSet0, bindDescriptorSet1A, bindDescriptorSet1B;
 
     // Resources
-    vsg::ImageInfo diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_color_prev, accum_moments_prev, accum_histlen_prev, varA, varB;
+    vsg::ref_ptr<vsg::ImageInfo> diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen,
+        accum_color_prev, accum_moments_prev, accum_histlen_prev, varA, varB;
 };

@@ -29,7 +29,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-vsg::ImageInfo createImage(uint32_t width, uint32_t height, VkFormat format)
+vsg::ref_ptr<vsg::ImageInfo> createImage(uint32_t width, uint32_t height, VkFormat format)
 {
     auto image = vsg::Image::create();
     image->imageType = VK_IMAGE_TYPE_2D;
@@ -47,7 +47,7 @@ vsg::ImageInfo createImage(uint32_t width, uint32_t height, VkFormat format)
     auto view = vsg::ImageView::create(image, VK_IMAGE_ASPECT_COLOR_BIT);
     view->viewType = VK_IMAGE_VIEW_TYPE_2D;
 
-    return { nullptr, view, VK_IMAGE_LAYOUT_GENERAL };
+    return vsg::ImageInfo::create(vsg::ref_ptr<vsg::Sampler>{}, view, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<IlluminationBuffer> illuBuffer, vsg::ref_ptr<AccumulationBuffer> accBuffer)
@@ -60,7 +60,7 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
                         "shaders/a-svgf/Atrous.comp.spv"};
 
     auto shaderStages = shaderNames.map<vsg::ref_ptr<vsg::ShaderStage>>([](const auto &name) {
-        return vsg::ShaderStage::readSpv(VK_SHADER_STAGE_COMPUTE_BIT, "main", name);
+        return vsg::ShaderStage::read(VK_SHADER_STAGE_COMPUTE_BIT, "main", name);
     });
 
     shaderStages.atrous->specializationConstants = vsg::ShaderStage::SpecializationConstants{
@@ -178,7 +178,7 @@ void A_SVGF::compile(vsg::Context &ctx)
 {
     for (auto &img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_color_prev, accum_moments_prev, accum_histlen_prev, varA, varB})
     {
-        img.imageView->compile(ctx);
+        img->imageView->compile(ctx);
     }
 }
 

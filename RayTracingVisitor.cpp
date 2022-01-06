@@ -2,19 +2,17 @@
 
 RayTracingSceneDescriptorCreationVisitor::RayTracingSceneDescriptorCreationVisitor()
 {
-    vsg::ubvec4 w{ 255, 255, 255, 255 };
-    auto white = vsg::ubvec4Array2D::create(1, 1, vsg::Data::Layout{ VK_FORMAT_R8G8B8A8_UNORM });
+    vsg::ubvec4 w{255, 255, 255, 255};
+    auto white = vsg::ubvec4Array2D::create(1, 1, vsg::Data::Layout{VK_FORMAT_R8G8B8A8_UNORM});
     std::copy(&w, &w + 1, white->data());
 
-    vsg::SamplerImage image;
-    image.data = white;
-    image.sampler = vsg::Sampler::create();
-    image.sampler->addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    image.sampler->addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    image.sampler->addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    image.sampler->anisotropyEnable = VK_FALSE;
-    image.sampler->maxLod = 1;
-    _defaultTexture = vsg::DescriptorImage::create(image);
+    auto sampler = vsg::Sampler::create();
+    sampler->addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler->addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler->addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler->anisotropyEnable = VK_FALSE;
+    sampler->maxLod = 1;
+    _defaultTexture = vsg::DescriptorImage::create(sampler, white, 0, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     _dummyBuffer = vsg::floatArray::create(1, 0.0f);
     _dummyVolume = vsg::floatArray3D::create(1,1,1, 0.0f, vsg::Data::Layout{ VK_FORMAT_R32_SFLOAT });
 }
@@ -22,11 +20,11 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::Object& object)
 {
     object.traverse(*this);
 }
-void RayTracingSceneDescriptorCreationVisitor::apply(vsg::MatrixTransform& mt)
+void RayTracingSceneDescriptorCreationVisitor::apply(vsg::Transform& t)
 {
-    _transformStack.pushAndPreMult(mt.getMatrix());
+    _transformStack.push(t);
 
-    mt.traverse(*this);
+    t.traverse(*this);
 
     _transformStack.pop();
 }
@@ -47,23 +45,23 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::VertexIndexDraw& vid)
     {
         instance.meshId = _positions.size();
         _vertexIndexDrawMap[&vid] = instance;
-        auto positions = vsg::DescriptorBuffer::create(vid.arrays[0], 2, _positions.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        auto positions = vsg::DescriptorBuffer::create(vid.arrays[0]->data, 2, _positions.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         _positions.push_back(positions);
         std::vector<vsg::vec3> nors(1);
-        std::memcpy(nors.data(), vid.arrays[1]->dataPointer(), sizeof(vsg::vec3));
+        std::memcpy(nors.data(), vid.arrays[1]->data->dataPointer(), sizeof(vsg::vec3));
         if (vsg::length2(nors[0]) == 0)
         {
             //normals have to be computed
-            nors.resize(vid.arrays[1]->dataSize() / sizeof(nors[0]));
-            std::memcpy(nors.data(), vid.arrays[1]->dataPointer(), vid.arrays[1]->dataSize());
+            nors.resize(vid.arrays[1]->data->dataSize() / sizeof(nors[0]));
+            std::memcpy(nors.data(), vid.arrays[1]->data->dataPointer(), vid.arrays[1]->data->dataSize());
             std::vector<float> weightSum(nors.size(), 0);
-            std::vector<vsg::vec3> positions(vid.arrays[0]->dataSize() / sizeof(vsg::vec3));
-            std::memcpy(positions.data(), vid.arrays[0]->dataPointer(), vid.arrays[0]->dataSize());
-            if (vid.indices->stride() == 4)
+            std::vector<vsg::vec3> positions(vid.arrays[0]->data->dataSize() / sizeof(vsg::vec3));
+            std::memcpy(positions.data(), vid.arrays[0]->data->dataPointer(), vid.arrays[0]->data->dataSize());
+            if (vid.indices->data->stride() == 4)
             {
                 //integer indices
-                std::vector<uint32_t> indices(vid.indices->dataSize() / sizeof(uint32_t));
-                std::memcpy(indices.data(), vid.indices->dataPointer(), vid.indices->dataSize());
+                std::vector<uint32_t> indices(vid.indices->data->dataSize() / sizeof(uint32_t));
+                std::memcpy(indices.data(), vid.indices->data->dataPointer(), vid.indices->data->dataSize());
                 for (int tri = 0; tri < indices.size() / 3; ++tri)
                 {
                     uint32_t indA = indices[3 * tri], indB = indices[3 * tri + 1], indC = indices[3 * tri + 2];
@@ -85,8 +83,8 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::VertexIndexDraw& vid)
             else
             {
                 //short indices
-                std::vector<uint16_t> indices(vid.indices->dataSize() / sizeof(uint16_t));
-                std::memcpy(indices.data(), vid.indices->dataPointer(), vid.indices->dataSize());
+                std::vector<uint16_t> indices(vid.indices->data->dataSize() / sizeof(uint16_t));
+                std::memcpy(indices.data(), vid.indices->data->dataPointer(), vid.indices->data->dataSize());
                 for (int tri = 0; tri < indices.size() / 3; ++tri)
                 {
                     uint32_t indA = indices[3 * tri], indB = indices[3 * tri + 1], indC = indices[3 * tri + 2];
@@ -106,43 +104,42 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::VertexIndexDraw& vid)
                 }
             }
             //for(auto& normal: nors) normal = vsg::normalize(normal);
-            std::memcpy(vid.arrays[1]->dataPointer(), nors.data(), vid.arrays[1]->dataSize());
+            std::memcpy(vid.arrays[1]->data->dataPointer(), nors.data(), vid.arrays[1]->data->dataSize());
         }
-        auto normals = vsg::DescriptorBuffer::create(vid.arrays[1], 3, _normals.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        auto normals = vsg::DescriptorBuffer::create(vid.arrays[1]->data, 3, _normals.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         _normals.push_back(normals);
         // auto fill up tex coords if not provided
         vsg::ref_ptr<vsg::DescriptorBuffer> texCoords;
-        int v = vid.arrays[2]->valueCount();
-        if (vid.arrays[2]->valueCount() == 0)
+        if (vid.arrays[2]->data->valueCount() == 0)
         {
-            auto data = vsg::vec2Array::create(vid.arrays[0]->valueCount());
-            for (int i = 0; i < vid.indices->valueCount() / 3; ++i)
+            auto data = vsg::vec2Array::create(vid.arrays[0]->data->valueCount());
+            for (int i = 0; i < vid.indices->data->valueCount() / 3; ++i)
             {
                 uint32_t index = 0;
-                if (vid.indices->stride() == 2) index = ((uint16_t*)(vid.indices->dataPointer()))[i * 3];
-                else index = ((uint32_t*)(vid.indices->dataPointer()))[i * 3];
+                if (vid.indices->data->stride() == 2) index = ((uint16_t*)(vid.indices->data->dataPointer()))[i * 3];
+                else index = ((uint32_t*)(vid.indices->data->dataPointer()))[i * 3];
                 data->at(index) = vsg::vec2(0, 0);
-                if (vid.indices->stride() == 2) index = ((uint16_t*)(vid.indices->dataPointer()))[i * 3 + 1];
-                else index = ((uint32_t*)(vid.indices->dataPointer()))[i * 3 + 1];
+                if (vid.indices->data->stride() == 2) index = ((uint16_t*)(vid.indices->data->dataPointer()))[i * 3 + 1];
+                else index = ((uint32_t*)(vid.indices->data->dataPointer()))[i * 3 + 1];
                 data->at(index) = vsg::vec2(0, 1);
-                if (vid.indices->stride() == 2) index = ((uint16_t*)(vid.indices->dataPointer()))[i * 3 + 2];
-                else index = ((uint32_t*)(vid.indices->dataPointer()))[i * 3 + 2];
+                if (vid.indices->data->stride() == 2) index = ((uint16_t*)(vid.indices->data->dataPointer()))[i * 3 + 2];
+                else index = ((uint32_t*)(vid.indices->data->dataPointer()))[i * 3 + 2];
                 data->at(index) = vsg::vec2(1, 0);
             }
-            vid.arrays[2] = data;
+            vid.arrays[2]->data = data;
         }
-        else texCoords = vsg::DescriptorBuffer::create(vid.arrays[2], 4, _texCoords.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        texCoords = vsg::DescriptorBuffer::create(vid.arrays[2]->data, 4, _texCoords.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         _texCoords.push_back(texCoords);
-        auto indices = vsg::DescriptorBuffer::create(vid.indices, 5, _indices.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        auto indices = vsg::DescriptorBuffer::create(vid.indices->data, 5, _indices.size(), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         _indices.push_back(indices);
-        instance.indexStride = vid.indices->stride();
+        instance.indexStride = vid.indices->data->stride();
     }
     _instancesArray.push_back(instance);
 
     //if emissive mesh create a mesh light for each triangle
     if (meshEmissive)
     {
-        for (int i = 0; i < vid.indices->valueCount() / 3; ++i)
+        for (int i = 0; i < vid.indices->data->valueCount() / 3; ++i)
         {
             vsg::Light l{};
             l.radius = 0;
@@ -156,15 +153,15 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::VertexIndexDraw& vid)
             l.strengths = vsg::vec3(0, 0, 1);
 
             uint32_t index = 0;
-            if (vid.indices->stride() == 2) index = ((uint16_t*)(vid.indices->dataPointer()))[i * 3];
-            else index = ((uint32_t*)(vid.indices->dataPointer()))[i * 3];
-            l.v0 = ((vsg::vec3*)vid.arrays[0]->dataPointer())[index];
-            if (vid.indices->stride() == 2) index = ((uint16_t*)(vid.indices->dataPointer()))[i * 3 + 1];
-            else index = ((uint32_t*)(vid.indices->dataPointer()))[i * 3 + 1];
-            l.v1 = ((vsg::vec3*)vid.arrays[0]->dataPointer())[index];
-            if (vid.indices->stride() == 2) index = ((uint16_t*)(vid.indices->dataPointer()))[i * 3 + 2];
-            else index = ((uint32_t*)(vid.indices->dataPointer()))[i * 3 + 2];
-            l.v2 = ((vsg::vec3*)vid.arrays[0]->dataPointer())[index];
+            if (vid.indices->data->stride() == 2) index = ((uint16_t*)(vid.indices->data->dataPointer()))[i * 3];
+            else index = ((uint32_t*)(vid.indices->data->dataPointer()))[i * 3];
+            l.v0 = ((vsg::vec3*)vid.arrays[0]->data->dataPointer())[index];
+            if (vid.indices->data->stride() == 2) index = ((uint16_t*)(vid.indices->data->dataPointer()))[i * 3 + 1];
+            else index = ((uint32_t*)(vid.indices->data->dataPointer()))[i * 3 + 1];
+            l.v1 = ((vsg::vec3*)vid.arrays[0]->data->dataPointer())[index];
+            if (vid.indices->data->stride() == 2) index = ((uint16_t*)(vid.indices->data->dataPointer()))[i * 3 + 2];
+            else index = ((uint32_t*)(vid.indices->data->dataPointer()))[i * 3 + 2];
+            l.v2 = ((vsg::vec3*)vid.arrays[0]->data->dataPointer())[index];
             //transforming the light position
             auto t = _transformStack.top() * vsg::dvec4{l.v0.x, l.v0.y, l.v0.z, 1};
             l.v0 = {static_cast<float>(t.x), static_cast<float>(t.y), static_cast<float>(t.z)};
@@ -182,7 +179,7 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::StateGroup& sg)
         firstStageGroup = false;
     else
     {
-        vsg::StateGroup::StateCommands& sc = sg.getStateCommands();
+        vsg::StateGroup::StateCommands& sc = sg.stateCommands;
         for (auto& state : sc)
         {
             auto bds = state.cast<vsg::BindDescriptorSet>();
@@ -204,11 +201,11 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::BindDescriptorSet& bds
         if (descriptor->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) //pbr material
         {
             auto d = descriptor.cast<vsg::DescriptorBuffer>();
-            if (d->bufferInfoList[0].data->dataSize() == sizeof(VsgPbrMaterial))
+            if (d->bufferInfoList[0]->data->dataSize() == sizeof(VsgPbrMaterial))
             {
                 // pbr material
                 VsgPbrMaterial vsgMat;
-                std::memcpy(&vsgMat, d->bufferInfoList[0].data->dataPointer(), sizeof(VsgPbrMaterial));
+                std::memcpy(&vsgMat, d->bufferInfoList[0]->data->dataPointer(), sizeof(VsgPbrMaterial));
                 WaveFrontMaterialPacked mat;
                 std::memcpy(&mat.ambientShininess, &vsgMat.baseColorFactor, sizeof(vsg::vec4));
                 std::memcpy(&mat.specularDissolve, &vsgMat.specularFactor, sizeof(vsg::vec4));
@@ -221,13 +218,14 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::BindDescriptorSet& bds
                 mat.diffuseIor.w = vsgMat.indexOfRefraction;
                 mat.specularDissolve.w = vsgMat.alphaMask;
                 mat.emissionTextureId.w = vsgMat.alphaMaskCutoff;
+                mat.category_id = vsgMat.category_id;
                 _materialArray.push_back(mat);
             }
             else
             {
                 // normal material
                 VsgMaterial vsgMat;
-                std::memcpy(&vsgMat, d->bufferInfoList[0].data->dataPointer(), sizeof(VsgMaterial));
+                std::memcpy(&vsgMat, d->bufferInfoList[0]->data->dataPointer(), sizeof(VsgMaterial));
                 WaveFrontMaterialPacked mat;
                 std::memcpy(&mat.ambientShininess, &vsgMat.ambient, sizeof(vsg::vec4));
                 std::memcpy(&mat.specularDissolve, &vsgMat.specular, sizeof(vsg::vec4));
@@ -239,6 +237,7 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::BindDescriptorSet& bds
                 mat.diffuseIor.w = 1;
                 mat.specularDissolve.w = vsgMat.alphaMask;
                 mat.emissionTextureId.w = vsgMat.alphaMaskCutoff;
+                mat.category_id = vsgMat.category_id;
                 _materialArray.push_back(mat);
             }
             continue;
@@ -256,7 +255,7 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::BindDescriptorSet& bds
             setTextures.insert(6);
             // check for opaqueness
             {
-                auto data = d->imageInfoList[0].imageView->image->data;
+                auto data = d->imageInfoList[0]->imageView->image->data;
                 //int amt = data->dataSize() / data->stride();
                 for (int i = 0; i < data->dataSize() / data->stride() && geometryType.back() == 0; ++i)
                 {
@@ -347,45 +346,48 @@ void RayTracingSceneDescriptorCreationVisitor::apply(vsg::Volumetric& vol)
     _volume.push_back(desc);
     geometryType.push_back(2);
 }
-vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::getBindDescriptorSet(
-    vsg::ref_ptr<vsg::PipelineLayout> pipelineLayout, const vsg::BindingMap& bindingMap)
-{
-    if (!_bindDescriptor)
-    {
-        if (packedLights.empty())
-        {
-            std::cout << "Adding default directional light for raytracing" << std::endl;
-            vsg::Light l;
-            l.radius = 0;
-            l.type = vsg::LightSourceType::Directional;
-            vsg::vec3 col{2.f, 2.f, 2.f};
-            l.colorAmbient = col;
-            l.colorDiffuse = col;
-            l.colorSpecular = {0, 0, 0};
-            l.strengths = vsg::vec3(.5f, .0f, .0f);
-            l.dir = vsg::normalize(vsg::vec3(0.1f, 1, -5.1f));
-            packedLights.push_back(l.getPacked());
-        }
-        if (!_lights)
-        {
-            auto lights = vsg::Array<vsg::Light::PackedLight>::create(std::max(packedLights.size(), size_t(1)));
-            std::copy(packedLights.begin(), packedLights.end(), lights->data());
-            _lights = vsg::DescriptorBuffer::create(lights, 12, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        }
-        if (!_materials)
-        {
-            auto materials = vsg::Array<WaveFrontMaterialPacked>::create(std::max(_materialArray.size(), size_t(1)));
-            std::copy(_materialArray.begin(), _materialArray.end(), materials->data());
-            _materials = vsg::DescriptorBuffer::create(materials, 13, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        }
-        if (!_instances)
-        {
-            auto instances = vsg::Array<ObjectInstance>::create(std::max(_instancesArray.size(), size_t(1)));
-            std::copy(_instancesArray.begin(), _instancesArray.end(), instances->data());
-            _instances = vsg::DescriptorBuffer::create(instances, 14, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        }
 
-        if (_diffuse.empty()) _diffuse.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
+void RayTracingSceneDescriptorCreationVisitor::updateDescriptor(vsg::BindDescriptorSet* descSet, const vsg::BindingMap& bindingMap)
+{
+    if (packedLights.empty())
+    {
+        std::cout << "Adding default directional light for raytracing" << std::endl;
+        vsg::Light l;
+        l.radius = 0;
+        l.type = vsg::LightSourceType::Directional;
+        vsg::vec3 col{2.f, 2.f, 2.f};
+        l.colorAmbient = col;
+        l.colorDiffuse = col;
+        l.colorSpecular = {0, 0, 0};
+        l.strengths = vsg::vec3(.5f, .0f, .0f);
+        l.dir = vsg::normalize(vsg::vec3(0.1f, 1, -5.1f));
+        packedLights.push_back(l.getPacked());
+    }
+    if (!_lights)
+    {
+        float strengthSum = 0;
+        for(auto& light: packedLights) {
+            strengthSum += light.colorAmbient.x + light.colorAmbient.y + light.colorAmbient.z + light.colorDiffuse.x + light.colorDiffuse.y + light.colorDiffuse.z + light.colorSpecular.x + light.colorSpecular.y + light.colorSpecular.z;
+            light.inclusiveStrength = strengthSum;
+        }
+        auto lights = vsg::Array<vsg::Light::PackedLight>::create(std::max(packedLights.size(), size_t(1)));
+        std::copy(packedLights.begin(), packedLights.end(), lights->data());
+        _lights = vsg::DescriptorBuffer::create(lights, 12, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    }
+    if (!_materials)
+    {
+        auto materials = vsg::Array<WaveFrontMaterialPacked>::create(std::max(_materialArray.size(), size_t(1)));
+        std::copy(_materialArray.begin(), _materialArray.end(), materials->data());
+        _materials = vsg::DescriptorBuffer::create(materials, 13, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    }
+    if (!_instances)
+    {
+        auto instances = vsg::Array<ObjectInstance>::create(std::max(_instancesArray.size(), size_t(1)));
+        std::copy(_instancesArray.begin(), _instancesArray.end(), instances->data());
+        _instances = vsg::DescriptorBuffer::create(instances, 14, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    }
+
+    if (_diffuse.empty()) _diffuse.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
         if (_mr.empty()) _mr.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
         if (_normal.empty()) _normal.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
         if (_emissive.empty()) _emissive.push_back(vsg::DescriptorImage::create(_defaultTexture->imageInfoList));
@@ -400,7 +402,7 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
         if (_volume.empty()) _volume.push_back(vsg::DescriptorImage::create(dummyVoxelSampler, _dummyVolume));
 
         // setting the descriptor amount for the object arrays
-        vsg::DescriptorSetLayoutBindings& bindings = pipelineLayout->setLayouts[0]->bindings;
+        vsg::DescriptorSetLayoutBindings& bindings = descSet->descriptorSet->setLayout->bindings;
         int posInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Pos").second;
         std::find_if(bindings.begin(), bindings.end(), [&](VkDescriptorSetLayoutBinding& b) { return b.binding == posInd; })->
             descriptorCount = static_cast<uint32_t>(_positions.size());
@@ -431,38 +433,38 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
         int volumeInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "gridImage").second;
         std::find_if(bindings.begin(), bindings.end(), [&](VkDescriptorSetLayoutBinding& b) { return b.binding == volumeInd; })->
                 descriptorCount = static_cast<uint32_t>(_volume.size());
-        int lightInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Lights").second;
-        int matInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Materials").second;
-        int instancesInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Instances").second;
+    int lightInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Lights").second;
+    int matInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Materials").second;
+    int instancesInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "Instances").second;
 
-        //adding all descriptors and updating their binding
-        vsg::Descriptors descList;
-        for (auto& d : _diffuse)
-        {
-            d->dstBinding = diffuseInd;
-            descList.push_back(d);
-        }
-        for (auto& d : _mr)
-        {
-            d->dstBinding = mrInd;
-            descList.push_back(d);
-        }
-        for (auto& d : _normal)
-        {
-            d->dstBinding = normalInd;
-            descList.push_back(d);
-        }
-        for (auto& d : _emissive)
-        {
-            d->dstBinding = emissiveInd;
-            descList.push_back(d);
-        }
-        for (auto& d : _specular)
-        {
-            d->dstBinding = specularInd;
-            descList.push_back(d);
-        }
-        for (auto& d : _volume)
+    //adding all descriptors and updating their binding
+    vsg::Descriptors descList;
+    for (auto& d : _diffuse)
+    {
+        d->dstBinding = diffuseInd;
+        descList.push_back(d);
+    }
+    for (auto& d : _mr)
+    {
+        d->dstBinding = mrInd;
+        descList.push_back(d);
+    }
+    for (auto& d : _normal)
+    {
+        d->dstBinding = normalInd;
+        descList.push_back(d);
+    }
+    for (auto& d : _emissive)
+    {
+        d->dstBinding = emissiveInd;
+        descList.push_back(d);
+    }
+    for (auto& d : _specular)
+    {
+        d->dstBinding = specularInd;
+        descList.push_back(d);
+    }
+    for (auto& d : _volume)
         {
             d->dstBinding = volumeInd;
             descList.push_back(d);
@@ -492,9 +494,7 @@ vsg::ref_ptr<vsg::BindDescriptorSet> RayTracingSceneDescriptorCreationVisitor::g
         {
             d->dstBinding = indInd;
             descList.push_back(d);
-        }
-        _descriptorSet = vsg::DescriptorSet::create(pipelineLayout->setLayouts[0], descList);
-        _bindDescriptor = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, _descriptorSet);
+
     }
-    return _bindDescriptor;
+    descSet->descriptorSet->descriptors = descList;
 }

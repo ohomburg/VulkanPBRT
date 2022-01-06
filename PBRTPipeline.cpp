@@ -7,6 +7,7 @@ namespace
     struct ConstantInfos
     {
         uint32_t lightCount;
+        float lightStrengthSum;
         uint32_t minRecursionDepth;
         uint32_t maxRecursionDepth;
         vsg::vec4 extinction, scattering;
@@ -24,8 +25,8 @@ namespace
 
 PBRTPipeline::PBRTPipeline(vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<AccumulationBuffer> accumulationBuffer,
                  vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin) : 
-    width(illuminationBuffer->illuminationImages[0]->imageInfoList[0].imageView->image->extent.width), 
-    height(illuminationBuffer->illuminationImages[0]->imageInfoList[0].imageView->image->extent.height), 
+    width(illuminationBuffer->illuminationImages[0]->imageInfoList[0]->imageView->image->extent.width),
+    height(illuminationBuffer->illuminationImages[0]->imageInfoList[0]->imageView->image->extent.height),
     maxRecursionDepth(2), 
     accumulationBuffer(accumulationBuffer),
     illuminationBuffer(illuminationBuffer),
@@ -47,7 +48,7 @@ void PBRTPipeline::setTlas(vsg::ref_ptr<vsg::AccelerationStructure> as)
         uint32_t& count = isTriangles ? triangleBlasCount : aabbBlasCount;
         tlas->geometryInstances[i]->id = count++;
         tlas->geometryInstances[i]->shaderOffset = geometryTypes[i];
-        tlas->geometryInstances[i]->geometryFlags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
+        tlas->geometryInstances[i]->flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
     }
     auto accelDescriptor = vsg::DescriptorAccelerationStructure::create(vsg::AccelerationStructures{as}, 0, 0);
     bindRayTracingDescriptorSet->descriptorSet->descriptors.push_back(accelDescriptor);
@@ -78,6 +79,14 @@ vsg::ref_ptr<IlluminationBuffer> PBRTPipeline::getIlluminationBuffer() const
 }
 void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
 {
+    // parsing data from scene
+    RayTracingSceneDescriptorCreationVisitor buildDescriptorBinding;
+    scene->accept(buildDescriptorBinding);
+    geometryTypes = buildDescriptorBinding.geometryType;
+
+    const int maxLights = 800;
+    if(buildDescriptorBinding.packedLights.size() > maxLights) lightSamplingMethod = LightSamplingMethod::SampleUniform;
+
     //creating the shader stages and shader binding table
     std::string raygenPath = "shaders/ptRaygen.rgen"; //raygen shader not yet precompiled
     std::string raymissPath = "shaders/ptMiss.rmiss.spv";
@@ -88,12 +97,12 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
     std::string cloudIntPath = "shaders/cloud.rint.spv";
 
     auto raygenShader = setupRaygenShader(raygenPath, useExternalGbuffer);
-    auto raymissShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_MISS_BIT_KHR, "main", raymissPath);
-    auto shadowMissShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_MISS_BIT_KHR, "main", shadowMissPath);
-    auto closesthitShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, "main", closesthitPath);
-    auto anyHitShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_ANY_HIT_BIT_KHR, "main", anyHitPath);
-    auto cloudHitShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, "main", cloudHitPath);
-    auto cloudIntShader = vsg::ShaderStage::readSpv(VK_SHADER_STAGE_INTERSECTION_BIT_KHR, "main", cloudIntPath);
+    auto raymissShader = vsg::ShaderStage::read(VK_SHADER_STAGE_MISS_BIT_KHR, "main", raymissPath);
+    auto shadowMissShader = vsg::ShaderStage::read(VK_SHADER_STAGE_MISS_BIT_KHR, "main", shadowMissPath);
+    auto closesthitShader = vsg::ShaderStage::read(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, "main", closesthitPath);
+    auto anyHitShader = vsg::ShaderStage::read(VK_SHADER_STAGE_ANY_HIT_BIT_KHR, "main", anyHitPath);
+    auto cloudHitShader = vsg::ShaderStage::read(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, "main", cloudHitPath);
+    auto cloudIntShader = vsg::ShaderStage::read(VK_SHADER_STAGE_INTERSECTION_BIT_KHR, "main", cloudIntPath);
     if (!raygenShader || !raymissShader || !closesthitShader || !shadowMissShader || !anyHitShader || !cloudHitShader || !cloudIntShader)
     {
         throw vsg::Exception{"Error: PBRTPipeline::PBRTPipeline(...) failed to create shader stages."};
@@ -141,18 +150,16 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
     shaderBindingTable->bindingTableEntries.raygenGroups = {raygenShaderGroup};
     shaderBindingTable->bindingTableEntries.raymissGroups = {raymissShaderGroup, shadowMissShaderGroup};
     shaderBindingTable->bindingTableEntries.hitGroups = {closesthitShaderGroup, transparenthitShaderGroup, cloudShaderGroup};
-    auto pipeline = vsg::RayTracingPipeline::create(rayTracingPipelineLayout, shaderStage, shaderGroups, shaderBindingTable);
+    auto pipeline = vsg::RayTracingPipeline::create(rayTracingPipelineLayout, shaderStage, shaderGroups, shaderBindingTable, 1);
     bindRayTracingPipeline = vsg::BindRayTracingPipeline::create(pipeline);
+    auto descriptorSet = vsg::DescriptorSet::create(descriptorSetLayout, vsg::Descriptors{});
+    bindRayTracingDescriptorSet = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rayTracingPipelineLayout, descriptorSet);
 
-    // parsing data from scene
-    RayTracingSceneDescriptorCreationVisitor buildDescriptorBinding;
-    scene->accept(buildDescriptorBinding);
-    bindRayTracingDescriptorSet = buildDescriptorBinding.getBindDescriptorSet(rayTracingPipelineLayout, bindingMap);
-    geometryTypes = buildDescriptorBinding.geometryType;
-
+    buildDescriptorBinding.updateDescriptor(bindRayTracingDescriptorSet, bindingMap);
     // creating the constant infos uniform buffer object
     auto constantInfos = ConstantInfosValue::create();
     constantInfos->value().lightCount = buildDescriptorBinding.packedLights.size();
+    constantInfos->value().lightStrengthSum = buildDescriptorBinding.packedLights.back().inclusiveStrength;
     constantInfos->value().maxRecursionDepth = maxRecursionDepth;
     constantInfos->value().extinction = vsg::vec4(1024, 1024, 1024, 0);
     constantInfos->value().scattering = vsg::vec4(1, 1, 1, 0);
@@ -181,7 +188,7 @@ vsg::ref_ptr<vsg::ShaderStage> PBRTPipeline::setupRaygenShader(std::string rayge
     }
     else
     {
-        if (illuminationBuffer.cast<IlluminationBufferFinal>())
+        if (illuminationBuffer.cast<IlluminatonBufferFinalFloat>())
         {
             defines.push_back("FINAL_IMAGE");
         }
@@ -194,31 +201,40 @@ vsg::ref_ptr<vsg::ShaderStage> PBRTPipeline::setupRaygenShader(std::string rayge
             defines.push_back("FINAL_IMAGE");
             defines.push_back("DEMOD_ILLUMINATION");
             defines.push_back("DEMOD_ILLUMINATION_SQUARED");
-            if (gBuffer)
-                defines.push_back("GBUFFER");
-            if (accumulationBuffer)
-                defines.push_back("PREV_GBUFFER");
         }
         else if (illuminationBuffer.cast<IlluminationBufferDemodulated>())
         {
             defines.push_back("DEMOD_ILLUMINATION");
             defines.push_back("DEMOD_ILLUMINATION_SQUARED");
-            if (gBuffer)
-                defines.push_back("GBUFFER");
-            if (accumulationBuffer)
-                defines.push_back("PREV_GBUFFER");
         }
         else
         {
             throw vsg::Exception{"Error: PBRTPipeline::setupRaygenShader(...) Illumination buffer not supported."};
         }
     }
+    if (gBuffer)
+        defines.push_back("GBUFFER");
+    if (accumulationBuffer)
+        defines.push_back("PREV_GBUFFER");
+
+    switch(lightSamplingMethod){
+        case LightSamplingMethod::SampleSurfaceStrength:
+            defines.push_back("LIGHT_SAMPLE_SURFACE_STRENGTH");
+            break;
+        case LightSamplingMethod::SampleLightStrength:
+            defines.push_back("LIGHT_SAMPLE_LIGHT_STRENGTH");
+            break;
+        default:
+            break;
+    }
 
     auto options = vsg::Options::create(vsgXchange::glsl::create());
     auto raygenShader = vsg::ShaderStage::read(VK_SHADER_STAGE_RAYGEN_BIT_KHR, "main", raygenPath, options);
-    auto shaderCompiler = vsg::ShaderCompiler::create();
-    vsg::Paths searchPaths{"shaders"};
-    shaderCompiler->compile(raygenShader, defines, searchPaths);
+    auto compileHints = vsg::ShaderCompileSettings::create();
+    compileHints->vulkanVersion = VK_API_VERSION_1_2;
+    compileHints->target = vsg::ShaderCompileSettings::SPIRV_1_4;
+    compileHints->defines = defines;
+    raygenShader->module->hints = compileHints;
 
     return raygenShader;
 }
