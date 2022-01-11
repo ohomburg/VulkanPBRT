@@ -52,7 +52,7 @@ void main()
 	vec2 moments_tempora = vec2(0);
 	float variance_spatial = 0.0;
 
-	vec4 z_center = texelFetch(tex_z_curr, ipos, 0);
+	vec4 z_center = imageLoad(tex_z_curr, ipos);
 	if(z_center.x < 0) {
 		imageStore(img_varianceA, ipos, vec4(c.rgb, 0));
 		return;
@@ -64,8 +64,8 @@ void main()
 			m += vec2(l, l * l);
 		}
 
-		vec3 n_center = texelFetch(tex_normal_curr, ipos, 0).xyz;
-		uint mesh_id_center =  floatBitsToUint(texelFetch(tex_vbuf_curr, ipos, 0).r);
+		vec3 n_center = imageLoad(tex_normal_curr, ipos).xyz;
+		uint mesh_id_center =  floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).r);
 
 		float sum_w = 1.0;
 		const int r = histlen > 1 ? 2 : 3;
@@ -77,13 +77,13 @@ void main()
 
 					float l = luminance(c.rgb);
 
-					float z_p = texelFetch(tex_z_curr, p, 0).x;
-					vec3 n_p = texelFetch(tex_normal_curr, p, 0).xyz;
+					float z_p = imageLoad(tex_z_curr, p).x;
+					vec3 n_p = imageLoad(tex_normal_curr, p).xyz;
 
 					float w_z = abs(z_p - z_center.x) / (z_center.y * length(vec2(xx, yy)) + 1e-2);
                     float w_n = pow(max(0, dot(n_p, n_center)), 128.0); 
 
-					uint mesh_id_p =  floatBitsToUint(texelFetch(tex_vbuf_curr, p, 0).r);
+					uint mesh_id_p =  floatBitsToUint(imageLoad(tex_vbuf_curr, p).r);
 
 					float w = exp(- w_z) * w_n * (mesh_id_center == mesh_id_p ? 1.0 : 0.0);
 

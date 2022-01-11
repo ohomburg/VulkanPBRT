@@ -68,21 +68,21 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
     };
 
     vsg::DescriptorSetLayoutBindings layoutBindings0 = {
-        {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {10, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {11, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {13, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {14, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
 
     vsg::DescriptorSetLayoutBindings layoutBindings1 = {
@@ -127,20 +127,22 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
 
     vsg::Descriptors desc0 {
         // TODO: find the correct inputs for the question-marked entries
-        vsg::DescriptorImage::create(/*unfiltered color?*/illuBuffer->illuminationImages[0]->imageInfoList, 0, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        vsg::DescriptorImage::create(/*unfiltered color?*/illuBuffer->illuminationImages[0]->imageInfoList, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accBuffer->prevIllu->imageInfoList, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(/*gradient positions?*/accBuffer->motion->imageInfoList, 2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(gBuffer->albedo->imageInfoList, 3, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(/*color?*/illuBuffer->illuminationImages[0]->imageInfoList, 4, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        vsg::DescriptorImage::create(/*gradient positions?*/accBuffer->motion->imageInfoList, 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(gBuffer->albedo->imageInfoList, 3, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(/*color?*/illuBuffer->illuminationImages[0]->imageInfoList, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(/*prev color? schied has color history buffer*/accBuffer->prevIllu->imageInfoList, 5, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(accBuffer->motion->imageInfoList, 6, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(gBuffer->depth->imageInfoList, 7, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        vsg::DescriptorImage::create(accBuffer->motion->imageInfoList, 6, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(gBuffer->depth->imageInfoList, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accBuffer->prevDepth->imageInfoList, 8, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(accum_moments_prev, 9, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(accum_histlen_prev, 10, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(gBuffer->normal->imageInfoList, 11, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        vsg::DescriptorImage::create(accum_moments_prev, 9, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(accum_histlen_prev, 10, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(gBuffer->normal->imageInfoList, 11, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accBuffer->prevNormal->imageInfoList, 12, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        /*TODO: 13, 14: curr and prev VBuffer (mesh ids)*/
+        /*TODO: 13, 14: curr and prev VBuffer (mesh ids), below are dummy*/
+        vsg::DescriptorImage::create(gBuffer->material->imageInfoList, 13, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(gBuffer->material->imageInfoList, 14, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
     };
 
     vsg::Descriptors desc1A {
@@ -176,10 +178,12 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
 
 void A_SVGF::compile(vsg::Context &ctx)
 {
-    for (auto &img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_color_prev, accum_moments_prev, accum_histlen_prev, varA, varB})
-    {
-        img->imageView->compile(ctx);
-    }
+    for (auto &desc : bindDescriptorSet0->descriptorSet->descriptors)
+        desc->compile(ctx);
+    for (auto &desc : bindDescriptorSet1A->descriptorSet->descriptors)
+        desc->compile(ctx);
+    for (auto &desc : bindDescriptorSet1B->descriptorSet->descriptors)
+        desc->compile(ctx);
 }
 
 void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
@@ -208,7 +212,7 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
     commandGraph->addChild(bindPipelines.createGradSamples);
     commandGraph->addChild(bindDescriptorSet0);
     commandGraph->addChild(bindDescriptorSet1A);
-    commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_ALL, 0, pushConstVal));
+    commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstVal));
     commandGraph->addChild(vsg::Dispatch::create(gradTileWidth, gradTileHeight, 1));
 
     auto pipelineBarrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
@@ -230,7 +234,7 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
                 TemporalAlpha,
                 ModulateAlbedo,
         });
-        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_ALL, 0, pushConstVal));
+        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstVal));
         commandGraph->addChild(vsg::Dispatch::create(gradTileWidth, gradTileHeight, 1));
         commandGraph->addChild(pipelineBarrier);
     }
@@ -265,7 +269,7 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
                 TemporalAlpha,
                 ModulateAlbedo && i == NumIterations - 1,
         });
-        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_ALL, 0, pushConstVal));
+        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstVal));
         commandGraph->addChild(vsg::Dispatch::create(tileWidth, tileHeight, 1));
         commandGraph->addChild(pipelineBarrier);
     }
@@ -276,4 +280,18 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
 vsg::ref_ptr<vsg::DescriptorImage> A_SVGF::getFinalDescriptorImage() const
 {
     return vsg::DescriptorImage::create(varA, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+}
+
+void A_SVGF::updateImageLayouts(vsg::Context &context)
+{
+    auto barr = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
+
+    VkImageSubresourceRange rr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    // NOTE: does not contain accum_color_prev, as it is not initialized properly.
+    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_moments_prev, accum_histlen_prev, varA, varB})
+    {
+        barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0, img->imageView->image, rr));
+    }
+
+    context.commands.emplace_back(barr);
 }

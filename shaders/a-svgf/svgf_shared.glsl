@@ -68,10 +68,10 @@ get_gradient_idx_from_tile_pos(ivec2 pos)
 }
 
 bool
-is_gradient_sample(usampler2D tex_gradient, ivec2 ipos, int gradientDownsample)
+is_gradient_sample(uimage2D tex_gradient, ivec2 ipos, int gradientDownsample)
 {
 	ivec2 ipos_grad = ipos / gradientDownsample;
-	uint u = texelFetch(tex_gradient, ipos_grad, 0).r;
+	uint u = imageLoad(tex_gradient, ipos_grad).r;
 
 	ivec2 tile_pos = ivec2((u & TILE_OFFSET_MASK), (u >> TILE_OFFSET_SHIFT) & TILE_OFFSET_MASK);
 	return (u >= (1u << 31) && all(equal(ipos_grad * gradientDownsample + tile_pos, ipos)));

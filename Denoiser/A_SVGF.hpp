@@ -50,6 +50,7 @@ public:
     void compile(vsg::Context&);
     void addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph);
     vsg::ref_ptr<vsg::DescriptorImage> getFinalDescriptorImage() const;
+    void updateImageLayouts(vsg::Context& context);
 
     int   GradientDownsample = 3;
     bool  ModulateAlbedo = true;

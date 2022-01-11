@@ -41,15 +41,15 @@ void main()
 	ivec2 ipos_grad = ivec2(gl_GlobalInvocationID.xy);
 	vec4 frag_color1, frag_color2;
 
-	uint u = texelFetch(tex_gradient_samples, ipos_grad, 0).r;
+	uint u = imageLoad(tex_gradient_samples, ipos_grad).r;
 
 	ivec2 tile_pos = ivec2((u & TILE_OFFSET_MASK), (u >> TILE_OFFSET_SHIFT) & TILE_OFFSET_MASK);
 	ivec2 ipos = ipos_grad * gradientDownsample + tile_pos;
-	float l_curr = luminance(texelFetch(tex_color_unfiltered,      ipos,      0).rgb);
+	float l_curr = luminance(imageLoad(tex_color_unfiltered,      ipos).rgb);
 	if(u >= (1u << 31)) {
 		uint idx_prev = (u >> (2 * TILE_OFFSET_SHIFT)) & ((1 << (31 - 2 * TILE_OFFSET_SHIFT)) - 1);
 
-		int w = textureSize(tex_color_unfiltered, 0).r;
+		int w = imageSize(tex_color_unfiltered).r;
 		ivec2 ipos_prev = ivec2(idx_prev % w, idx_prev / w);
 
 		float l_prev = luminance(texelFetch(tex_color_unfiltered_prev, ipos_prev, 0).rgb);
@@ -65,14 +65,14 @@ void main()
 
 	vec2 moments = vec2(l_curr, l_curr * l_curr);
 	float sum_w = 1.0;
-	vec2 z_curr = texelFetch(tex_z_curr, ipos, 0).rg;
-	uint mesh_id  = floatBitsToUint(texelFetch(tex_vbuf_curr, ipos, 0).r);
+	vec2 z_curr = imageLoad(tex_z_curr, ipos).rg;
+	uint mesh_id  = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).r);
     for(int yy = 0; yy < gradientDownsample; yy++) {
 		for(int xx = 0; xx < gradientDownsample; xx++) {
 			ivec2 p = ipos_grad * gradientDownsample + ivec2(xx, yy);
 			if(!all(equal(ipos, p))) {
-				vec3 rgb = texelFetch(tex_color_unfiltered, p, 0).rgb;
-				uint mesh_id_p = floatBitsToUint(texelFetch(tex_vbuf_curr, p, 0).r);
+				vec3 rgb = imageLoad(tex_color_unfiltered, p).rgb;
+				uint mesh_id_p = floatBitsToUint(imageLoad(tex_vbuf_curr, p).r);
 
 				float l = luminance(rgb);
 

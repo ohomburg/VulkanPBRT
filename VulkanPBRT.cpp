@@ -512,6 +512,7 @@ int main(int argc, char** argv){
         case DenoisingType::ASVGF: {
             auto a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer);
             a_svgf->compile(imageLayoutCompile.context);
+            a_svgf->updateImageLayouts(imageLayoutCompile.context);
             a_svgf->addDispatchToCommandGraph(commands);
             finalDescriptorImage = a_svgf->getFinalDescriptorImage();
             break;

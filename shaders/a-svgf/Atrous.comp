@@ -64,8 +64,8 @@ float compute_sigma_luminance(float center, ivec2 ipos)
 ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
 
 vec4  color_center  = imageLoad(img_varianceA,  ipos);
-vec3  normal_center = texelFetch(tex_normal_curr, ipos, 0).rgb;
-vec4  z_center      = texelFetch(tex_z_curr,      ipos, 0);
+vec3  normal_center = imageLoad(tex_normal_curr, ipos).rgb;
+vec4  z_center      = imageLoad(tex_z_curr,      ipos);
 
 float l_center      = luminance(color_center.rgb);
 float sigma_l       = compute_sigma_luminance(color_center.a, ipos) * 3.0;
@@ -79,8 +79,8 @@ void tap(ivec2 offset, float kernel_weight)
 	ivec2 p = ipos + offset;
 
 	vec4  color_p     = imageLoad(img_varianceA, p);
-	vec3  normal_p    = texelFetch(tex_normal_curr, p, 0).rgb;
-	float z_p         = texelFetch(tex_z_curr,      p, 0).x;
+	vec3  normal_p    = imageLoad(tex_normal_curr, p).rgb;
+	float z_p         = imageLoad(tex_z_curr,      p).x;
 	float l_p         = luminance(color_p.rgb);
 
 	float w_l = abs(l_p - l_center) / (sigma_l + 1e-10); 
@@ -216,7 +216,7 @@ void main()
 	vec4 frag_color      = vec4(sum_color, sum_variance);
 
 	if(modulate_albedo > 0) {
-		frag_color.rgb *= texelFetch(tex_albedo, ipos, 0).rgb;
+		frag_color.rgb *= imageLoad(tex_albedo, ipos).rgb;
 	}
 
 	imageStore(img_varianceB, ipos, frag_color);
