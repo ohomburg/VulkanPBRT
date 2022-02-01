@@ -142,7 +142,8 @@ void GraphicsPipeline::compile(Context& context)
         combined_pipelineStates.insert(combined_pipelineStates.end(), pipelineStates.begin(), pipelineStates.end());
         combined_pipelineStates.insert(combined_pipelineStates.end(), context.overridePipelineStates.begin(), context.overridePipelineStates.end());
 
-        _implementation[viewID] = GraphicsPipeline::Implementation::create(context, context.device, context.renderPass, layout, stages, combined_pipelineStates, subpass);
+        auto renderPassToUse = renderPass ? renderPass : context.renderPass;
+        _implementation[viewID] = GraphicsPipeline::Implementation::create(context, context.device, renderPassToUse, layout, stages, combined_pipelineStates, subpass);
     }
 }
 

@@ -24,13 +24,14 @@ namespace
 }
 
 PBRTPipeline::PBRTPipeline(vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<AccumulationBuffer> accumulationBuffer,
-                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin) : 
+                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, vsg::ref_ptr<GradientProjector> gradProjector, bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin) :
     width(illuminationBuffer->illuminationImages[0]->imageInfoList[0]->imageView->image->extent.width),
     height(illuminationBuffer->illuminationImages[0]->imageInfoList[0]->imageView->image->extent.height),
     maxRecursionDepth(2), 
     accumulationBuffer(accumulationBuffer),
     illuminationBuffer(illuminationBuffer),
-    gBuffer(gBuffer)
+    gBuffer(gBuffer),
+    gradientProjector(gradProjector)
 {
     if (writeGBuffer) assert(gBuffer);
     bool useExternalGBuffer = rayTracingRayOrigin == RayTracingRayOrigin::GBUFFER;
@@ -175,6 +176,8 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
         gBuffer->updateDescriptor(bindRayTracingDescriptorSet, bindingMap);
     if (accumulationBuffer)
         accumulationBuffer->updateDescriptor(bindRayTracingDescriptorSet, bindingMap);
+    if (gradientProjector)
+        gradientProjector->updateDescriptor(bindRayTracingDescriptorSet, bindingMap);
 }
 vsg::ref_ptr<vsg::ShaderStage> PBRTPipeline::setupRaygenShader(std::string raygenPath, bool useExternalGBuffer)
 {
@@ -216,6 +219,8 @@ vsg::ref_ptr<vsg::ShaderStage> PBRTPipeline::setupRaygenShader(std::string rayge
         defines.push_back("GBUFFER");
     if (accumulationBuffer)
         defines.push_back("PREV_GBUFFER");
+    if (gradientProjector)
+        defines.push_back("TEMP_GRADIENT");
 
     switch(lightSamplingMethod){
         case LightSamplingMethod::SampleSurfaceStrength:

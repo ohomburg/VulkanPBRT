@@ -4,6 +4,7 @@
 #include "IlluminationBuffer.hpp"
 #include "RayTracingVisitor.hpp"
 #include "AccumulationBuffer.hpp"
+#include "Denoiser/A_SVGF.hpp"
 
 #include <vsg/all.h>
 #include <vsgXchange/glsl.h>
@@ -20,7 +21,7 @@ class PBRTPipeline : public vsg::Inherit<vsg::Object, PBRTPipeline>
 {
 public:
     PBRTPipeline(vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<AccumulationBuffer> accumulationBuffer,
-                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin);
+                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, vsg::ref_ptr<GradientProjector> gradProjector, bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin);
 
     void setTlas(vsg::ref_ptr<vsg::AccelerationStructure> as);
     void compile(vsg::Context& context);
@@ -43,6 +44,7 @@ private:
     vsg::ref_ptr<GBuffer> gBuffer;
     vsg::ref_ptr<AccumulationBuffer> accumulationBuffer;
     vsg::ref_ptr<IlluminationBuffer> illuminationBuffer;
+    vsg::ref_ptr<GradientProjector> gradientProjector;
 
     //resources which have to be added as childs to a scenegraph for rendering
     vsg::ref_ptr<vsg::BindRayTracingPipeline> bindRayTracingPipeline;

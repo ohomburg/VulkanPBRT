@@ -1,0 +1,132 @@
+#version 450
+
+/*
+Adapted from https://cg.ivd.kit.edu/atf.php
+Modifications Copyright 2021/2022 Oskar Homburg
+
+Copyright (c) 2018, Christoph Schied
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the Karlsruhe Institute of Technology nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+#include "svgf_shared.glsl"
+
+layout(constant_id=0) const int gradientDownsample = 3;
+layout(constant_id=1) const int imageResX = 1920;
+layout(constant_id=2) const int imageResY = 1080;
+
+const ivec2 imageRes = ivec2(imageResX, imageResY);
+
+layout(push_constant) uniform PerFrameCB {
+    mat4 mat_reproj; // VP-matrix times inverse of previous VP-matrix
+	uint frameNum;
+};
+
+layout(binding=0)          uniform  sampler2D tex_depth;
+layout(binding=1)          uniform  sampler2D tex_merged_prev;
+layout(binding=2)          uniform usampler2D tex_vis;
+layout(binding=3, rgba32f) uniform    image2D img_merged;
+layout(binding=4, r32ui)   uniform   uimage2D img_grad_samples;
+
+layout (local_size_x=8, local_size_y=8, local_size_z=1) in;
+
+void encrypt_tea(inout uvec2 arg)
+{
+    const uint key[] = {
+            0xa341316c, 0xc8013ea4, 0xad90777d, 0x7e95761e
+    };
+    uint v0 = arg[0], v1 = arg[1];
+    uint sum = 0;
+    uint delta = 0x9e3779b9;
+
+    for (int i = 0; i < 16; i++)
+    {
+        sum += delta;
+        v0 += ((v1 << 4) + key[0]) ^ (v1 + sum) ^ ((v1 >> 5) + key[1]);
+        v1 += ((v0 << 4) + key[2]) ^ (v0 + sum) ^ ((v0 >> 5) + key[3]);
+    }
+    arg[0] = v0;
+    arg[1] = v1;
+}
+
+void main()
+{
+	ivec2 idx_prev;
+	{
+		ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
+		uvec2 arg = uvec2(ipos.x + ipos.y * imageResX, frameNum);
+		encrypt_tea(arg);
+		arg %= gradientDownsample;
+		idx_prev = ivec2(ipos * gradientDownsample + arg);
+	}
+
+    // assemble previous frame world position from pixel coord and z
+    vec4 prev_data = texelFetch(tex_merged_prev, idx_prev, 0);
+    vec3 prev_pos = vec3(vec2(idx_prev), abs(prev_data.x));
+
+    // HACK: as the current version does not support animations, everything is static.
+    // This would be the place to account for motion by splitting the re-projection matrix into
+    // previous inverse projection, model/world-space motion, current projection.
+
+    vec4 prev_pos_reproj = mat_reproj * vec4(prev_pos, 1);
+
+	// check whether gradient sample projects outside the screen
+	if (any(lessThanEqual(prev_pos_reproj.xyz, -prev_pos_reproj.www))
+	    || any(greaterThanEqual(prev_pos_reproj.xyz, prev_pos_reproj.www)))
+	{
+		return;
+	}
+
+    prev_pos_reproj.xyz /= prev_pos_reproj.w;
+    prev_pos_reproj.xyz *= 0.5;
+    prev_pos_reproj.xyz += 0.5;
+
+	ivec2 idx_curr = ivec2(prev_pos_reproj.xy * imageRes);
+
+    // discard pixels that were already reprojected once
+    if (prev_data.x < 0) return;
+
+    // check that we have the same depth
+    float z_curr = texelFetch(tex_depth, idx_curr, 0).x;
+    if (abs(z_curr - prev_pos_reproj.z) > 0.01) return;
+
+    // check that we have the same mesh
+    uint mesh_curr = texelFetch(tex_vis, idx_curr, 0).x;
+    if (floatBitsToUint(prev_data.y) != mesh_curr) return;
+
+	ivec2 tile_pos_curr = idx_curr / gradientDownsample;
+	uint gradient_idx_curr = get_gradient_idx_from_tile_pos(idx_curr % gradientDownsample);
+
+	// encode position in previous frame
+	gradient_idx_curr |= (idx_prev.x + idx_prev.y * imageResX) << (2 * TILE_OFFSET_SHIFT);
+
+	uint res = imageAtomicCompSwap(img_grad_samples, tile_pos_curr, 0u, gradient_idx_curr);
+	if (res == 0)
+	{
+	    // mark as from previous frame
+	    prev_data.x = -prev_data.x;
+	    prev_data.zw = fract(prev_pos_reproj.xy * imageRes);
+	    imageStore(img_merged, idx_curr, prev_data);
+	}
+}

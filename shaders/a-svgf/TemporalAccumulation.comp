@@ -53,42 +53,40 @@ void main()
 	ivec2 ipos   = ivec2(gl_GlobalInvocationID.xy);
 	ivec2 size   = imageSize(tex_motion).rg;
 
-	vec2 motion   = imageLoad(tex_motion, ipos).rg + jitter_offset;
-	vec2 pos_prev = gl_GlobalInvocationID.xy + motion * 0.5 * vec2(textureSize(tex_z_prev, 0));
+	vec2 pos_prev = imageLoad(tex_motion, ipos).rg;
 
 	ivec2 p = ivec2(pos_prev - 0.5);
 	vec2  w = (pos_prev - 0.5) - floor(pos_prev - 0.5);
 
-	vec4  z_curr       = imageLoad(tex_z_curr,      ipos);
+    float z_curr       = abs(imageLoad(tex_vbuf_curr, ipos).x);
 	vec3  color_curr   = imageLoad(tex_color,       ipos).rgb;
 	vec3  normal_curr  = imageLoad(tex_normal_curr, ipos).rgb;
 	float l            = luminance(color_curr);
 	vec2  moments_curr = vec2(l, l * l);
-	uint mesh_id_curr = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).r);
+	uint  mesh_id_curr = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
 
 	vec4 color_prev   = vec4(0);
 	vec2 moments_prev = vec2(0);
 	float sum_w       = 0.0;
 	float histlen     = 0.0;
-	/* bilinear interpolation, check each tap individually, renormalize
-	 * afterwards */
-	for(int yy = 0; yy <= 1; yy++) {
-		for(int xx = 0; xx <= 1; xx++) {
+	// bilinear interpolation, check each tap individually, renormalize afterwards
+	for (int yy = 0; yy <= 1; yy++) {
+		for (int xx = 0; xx <= 1; xx++) {
 			ivec2 ipos_prev    = p + ivec2(xx, yy);
-			float z_prev       = texelFetch(tex_z_prev,      ipos_prev, 0).r;
+			float z_prev       = abs(texelFetch(tex_vbuf_prev, ipos_prev, 0).x);
 			vec3  normal_prev  = texelFetch(tex_normal_prev, ipos_prev, 0).rgb;
-			uint mesh_id_prev  = floatBitsToUint(imageLoad(tex_vbuf_prev, ipos_prev).r);
+			uint mesh_id_prev  = floatBitsToUint(texelFetch(tex_vbuf_prev, ipos_prev, 0).y);
 
 			bool accept = true;
 			accept = accept && test_inside_screen(ipos_prev, size);
 			accept = accept && test_reprojected_normal(normal_curr, normal_prev);
-			accept = accept && test_reprojected_depth(z_curr.z, z_prev, z_curr.y);
+			accept = accept && abs(z_curr - z_prev) < 0.01;
 			accept = accept && mesh_id_prev == mesh_id_curr;
 
 			if(accept) {
 				float w = (xx == 0 ? (1.0 - w.x) : w.x)
 					    * (yy == 0 ? (1.0 - w.y) : w.y);
-				color_prev   += texelFetch(tex_color_prev,    ipos_prev, 0) * w;
+				color_prev   += imageLoad(tex_color_prev,     ipos_prev) * w;
 				moments_prev += imageLoad(tex_moments_prev,   ipos_prev).rg * w;
 				histlen      += imageLoad(tex_history_length, ipos_prev).r  * w;
 				sum_w        += w;
@@ -128,8 +126,7 @@ void main()
 
 #endif
 
-
-	if(sum_w > 0.01) { /* found sufficiently reliable history information */
+	if (sum_w > 0.01) { /* found sufficiently reliable history information */
 		color_prev   /= sum_w;
 		moments_prev /= sum_w;
 		histlen      /= sum_w;

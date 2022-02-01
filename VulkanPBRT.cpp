@@ -5,6 +5,7 @@
 #include "Denoiser/BFRBlender.hpp"
 #include "Denoiser/BMFR.hpp"
 #include "Denoiser/A_SVGF.hpp"
+#include "VBuffer.hpp"
 #include "PipelineStructs.hpp"
 #include "CountTrianglesVisitor.hpp"
 #include "gui.hpp"
@@ -317,14 +318,21 @@ int main(int argc, char** argv){
         rayTracingPushConstantsValue->value().prevView = lookAt->transform();
         rayTracingPushConstantsValue->value().frameNumber = 0;
         rayTracingPushConstantsValue->value().sampleNumber = 0;
-        auto pushConstants = vsg::PushConstants::create(VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, rayTracingPushConstantsValue);
+        auto pushConstants = vsg::PushConstants::create(VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 0, rayTracingPushConstantsValue);
         auto computeConstants = vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, rayTracingPushConstantsValue);
 
         vsg::ref_ptr<GBuffer> gBuffer;
         vsg::ref_ptr<IlluminationBuffer> illuminationBuffer;
         vsg::ref_ptr<AccumulationBuffer> accumulationBuffer;
         bool writeGBuffer;
-        if (denoisingType != DenoisingType::None)
+        if (denoisingType == DenoisingType::ASVGF)
+        {
+            gBuffer = GBuffer::create(windowTraits->width, windowTraits->height);
+            accumulationBuffer = AccumulationBuffer::create(windowTraits->width, windowTraits->height);
+            writeGBuffer = true;
+            illuminationBuffer = IlluminationBufferFinalDemodulated::create(windowTraits->width, windowTraits->height);
+        }
+        else if (denoisingType != DenoisingType::None)
         {
             gBuffer = GBuffer::create(windowTraits->width, windowTraits->height);
             accumulationBuffer = AccumulationBuffer::create(windowTraits->width, windowTraits->height);
@@ -348,9 +356,16 @@ int main(int argc, char** argv){
         // raytracing pipeline setup
         uint32_t maxRecursionDepth = 2;
         vsg::ref_ptr<PBRTPipeline> pbrtPipeline;
+        vsg::ref_ptr<GradientProjector> gradientProjector;
+        vsg::ref_ptr<VBuffer> vBuffer;
+        if (denoisingType == DenoisingType::ASVGF) {
+            vBuffer = VBuffer::create(windowTraits->width, windowTraits->height);
+            vBuffer->setScene(*loaded_scene);
+            gradientProjector = GradientProjector::create(vBuffer);
+        }
         if(!externalRenderings)
         {
-            pbrtPipeline = PBRTPipeline::create(loaded_scene, gBuffer, accumulationBuffer, illuminationBuffer, writeGBuffer, RayTracingRayOrigin::CAMERA);
+            pbrtPipeline = PBRTPipeline::create(loaded_scene, gBuffer, accumulationBuffer, illuminationBuffer, gradientProjector, writeGBuffer, RayTracingRayOrigin::CAMERA);
 
             // setup tlas
             vsg::BuildAccelerationStructureTraversal buildAccelStruct(device);
@@ -375,6 +390,14 @@ int main(int argc, char** argv){
         auto commands = vsg::Commands::create();
         auto offlineGBufferStager = OfflineGBuffer::create();
         auto offlineIlluminationBufferStager = OfflineIllumination::create();
+        if (vBuffer) {
+            vBuffer->compile(imageLayoutCompile.context);
+        }
+        if (gradientProjector) {
+            gradientProjector->compile(imageLayoutCompile.context);
+            gradientProjector->updateImageLayouts(imageLayoutCompile.context);
+            gradientProjector->addDispatchToCommandGraph(commands);
+        }
         if(pbrtPipeline){
             pbrtPipeline->addTraceRaysToCommandGraph(commands, pushConstants);
             illuminationBuffer = pbrtPipeline->getIlluminationBuffer();
@@ -510,7 +533,7 @@ int main(int argc, char** argv){
             }
             break;
         case DenoisingType::ASVGF: {
-            auto a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer);
+            auto a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer, gradientProjector);
             a_svgf->compile(imageLayoutCompile.context);
             a_svgf->updateImageLayouts(imageLayoutCompile.context);
             a_svgf->addDispatchToCommandGraph(commands);
@@ -588,6 +611,7 @@ int main(int argc, char** argv){
         renderGraph->clearValues.clear();   //removing clear values to avoid clearing the raytraced image
 
         auto commandGraph = vsg::CommandGraph::create(window);
+        if (vBuffer) commandGraph->addChild(vBuffer->renderGraph);
         commandGraph->addChild(commands);
         commandGraph->addChild(vsg::CopyImageViewToWindow::create(finalDescriptorImage->imageInfoList[0]->imageView, window));
         commandGraph->addChild(renderGraph);
@@ -619,7 +643,11 @@ int main(int argc, char** argv){
             viewer->handleEvents();
 
             //update push constants
+            if (vBuffer)
+                vBuffer->viewProjectMatrixValue->value() = perspective->transform() * lookAt->transform();
             rayTracingPushConstantsValue->value().viewInverse = lookAt->inverse();
+            if (gradientProjector)
+                gradientProjector->updatePushConstants(perspective->transform(), lookAt->transform(), rayTracingPushConstantsValue->value().frameNumber);
 
             rayTracingPushConstantsValue->value().frameNumber++;
             rayTracingPushConstantsValue->value().sampleNumber++;

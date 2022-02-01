@@ -1,19 +1,17 @@
 // GBuffer inputs
 layout(set=0, binding=0, rgba32f)  uniform   image2D tex_color_unfiltered;
 layout(set=0, binding=1)           uniform sampler2D tex_color_unfiltered_prev;
-layout(set=0, binding=2, rgba32ui) uniform  uimage2D tex_gradient_samples;
+layout(set=0, binding=2, r32ui)    uniform  uimage2D tex_gradient_samples;
 layout(set=0, binding=3, rgba32f)  uniform   image2D tex_albedo;
-layout(set=0, binding=4, rgba32f)  uniform   image2D tex_color;
-layout(set=0, binding=5)           uniform sampler2D tex_color_prev;
+layout(set=0, binding=4, rgba8)    uniform   image2D tex_color;
+layout(set=0, binding=5, rgba16f)  uniform   image2D tex_color_prev;
 layout(set=0, binding=6, rgba32f)  uniform   image2D tex_motion;
-layout(set=0, binding=7, rgba32f)  uniform   image2D tex_z_curr;
-layout(set=0, binding=8)           uniform sampler2D tex_z_prev;
 layout(set=0, binding=9, rgba32f)  uniform   image2D tex_moments_prev;
 layout(set=0, binding=10, rgba32f) uniform   image2D tex_history_length;
 layout(set=0, binding=11, rgba32f) uniform   image2D tex_normal_curr;
 layout(set=0, binding=12)          uniform sampler2D tex_normal_prev;
 layout(set=0, binding=13, rgba32f) uniform   image2D tex_vbuf_curr;
-layout(set=0, binding=14, rgba32f) uniform   image2D tex_vbuf_prev;
+layout(set=0, binding=14)          uniform sampler2D tex_vbuf_prev;
 
 // outputs from CreateGradientSamples
 layout(set=1, binding=0, rgba32f) uniform image2D img_diffA1;

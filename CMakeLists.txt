@@ -52,7 +52,11 @@ set(SHADERS
     a-svgf/AtrousGradient.comp
     a-svgf/CreateGradientSamples.comp
     a-svgf/EstimateVariance.comp
+    a-svgf/GradientForwardProject.comp
+    a-svgf/GradientImg.comp
     a-svgf/TemporalAccumulation.comp
+    vbuffer.frag
+    vbuffer.vert
 )
 
 set(UNCOMPILED_SHADERS

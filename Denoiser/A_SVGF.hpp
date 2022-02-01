@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vsg/all.h>
 #include "../AccumulationBuffer.hpp"
 #include "../GBuffer.hpp"
+#include "../VBuffer.hpp"
 #include "../IlluminationBuffer.hpp"
 
 struct ASvgfPushConst {
@@ -43,9 +44,40 @@ struct ASvgfPushConst {
     int modulate_albedo;
 };
 
+struct GradientProjectPushConst {
+    vsg::mat4 reprojectionMatrix;
+    unsigned frameNum;
+};
+
+class GradientProjector : public vsg::Inherit<vsg::Object, GradientProjector> {
+    friend class A_SVGF;
+public:
+    explicit GradientProjector(vsg::ref_ptr<VBuffer> vBuffer);
+
+    void compile(vsg::Context&);
+    void addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph);
+    void updateImageLayouts(vsg::Context& context) const;
+    void updateDescriptor(vsg::BindDescriptorSet* descSet, const vsg::BindingMap& bindingMap) const;
+    void updatePushConstants(vsg::dmat4 projMatrix, vsg::dmat4 viewMatrix, unsigned frameNum);
+
+    uint32_t width, height;
+    int GradientDownsample = 3;
+    vsg::ref_ptr<vsg::DescriptorImage> mergedVisBuffer; // RGBA32: frameId (bit 31) + depth (30..0), meshId, samplePos X/Y
+    vsg::ref_ptr<vsg::DescriptorImage> prevVisBuffer; // same from previous frame.
+    vsg::ref_ptr<vsg::DescriptorImage> gradientSamples; // tracking image for subsampled blocks
+
+private:
+    vsg::ref_ptr<vsg::BindComputePipeline> bindCreateImg, bindProject;
+    vsg::ref_ptr<vsg::BindDescriptorSet> bindDescriptorSetCI, bindDescriptorSetP;
+    vsg::ref_ptr<vsg::Value<GradientProjectPushConst>> pushConstValue;
+    vsg::mat4 prevProjMatrix, prevViewMatrix;
+};
+
 class A_SVGF : public vsg::Inherit<vsg::Object, A_SVGF> {
 public:
-    A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<IlluminationBuffer> illuBuffer, vsg::ref_ptr<AccumulationBuffer> accBuffer);
+    A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
+           vsg::ref_ptr<IlluminationBuffer> illuBuffer, vsg::ref_ptr<AccumulationBuffer> accBuffer,
+           vsg::ref_ptr<GradientProjector> gradProjector);
 
     void compile(vsg::Context&);
     void addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph);
@@ -57,7 +89,7 @@ public:
     int   NumIterations = 5;
     int   HistoryTap = 0;
     int   FilterKernel = 1;
-    float TemporalAlpha = 0.1f;
+    float TemporalAlpha = 0.9f;
     int   DiffAtrousIterations = 5;
     int   GradientFilterRadius = 2;
     bool  NormalizeGradient = true;
@@ -88,5 +120,5 @@ private:
 
     // Resources
     vsg::ref_ptr<vsg::ImageInfo> diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen,
-        accum_color_prev, accum_moments_prev, accum_histlen_prev, varA, varB;
+        accum_moments_prev, accum_histlen_prev, varA, varB, color_hist;
 };

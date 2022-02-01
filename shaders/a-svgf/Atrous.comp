@@ -65,7 +65,8 @@ ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
 
 vec4  color_center  = imageLoad(img_varianceA,  ipos);
 vec3  normal_center = imageLoad(tex_normal_curr, ipos).rgb;
-vec4  z_center      = imageLoad(tex_z_curr,      ipos);
+float z_center      = abs(imageLoad(tex_vbuf_curr, ipos).x);
+float z_grad        = abs(abs(imageLoad(tex_vbuf_curr, ipos + ivec2(1, 1)).x) - z_center);
 
 float l_center      = luminance(color_center.rgb);
 float sigma_l       = compute_sigma_luminance(color_center.a, ipos) * 3.0;
@@ -80,11 +81,11 @@ void tap(ivec2 offset, float kernel_weight)
 
 	vec4  color_p     = imageLoad(img_varianceA, p);
 	vec3  normal_p    = imageLoad(tex_normal_curr, p).rgb;
-	float z_p         = imageLoad(tex_z_curr,      p).x;
+	float z_p         = abs(imageLoad(tex_vbuf_curr, p).x);
 	float l_p         = luminance(color_p.rgb);
 
 	float w_l = abs(l_p - l_center) / (sigma_l + 1e-10); 
-	float w_z = 3.0 * abs(z_p - z_center.x) / (z_center.y * length(vec2(offset) * step_size) + 1e-2);
+	float w_z = 3.0 * abs(z_p - z_center) / (z_grad * length(vec2(offset) * step_size) + 1e-2);
 	float w_n = pow(max(0, dot(normal_p, normal_center)), 128.0);
 
 	float w = exp(-w_l * w_l - w_z) * kernel_weight * w_n;

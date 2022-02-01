@@ -29,7 +29,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-vsg::ref_ptr<vsg::ImageInfo> createImage(uint32_t width, uint32_t height, VkFormat format)
+vsg::ref_ptr<vsg::ImageInfo> createImage(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage = 0)
 {
     auto image = vsg::Image::create();
     image->imageType = VK_IMAGE_TYPE_2D;
@@ -41,7 +41,7 @@ vsg::ref_ptr<vsg::ImageInfo> createImage(uint32_t width, uint32_t height, VkForm
     image->arrayLayers = 1;
     image->samples = VK_SAMPLE_COUNT_1_BIT;
     image->tiling = VK_IMAGE_TILING_OPTIMAL;
-    image->usage = VK_IMAGE_USAGE_STORAGE_BIT;
+    image->usage = VK_IMAGE_USAGE_STORAGE_BIT | usage;
     image->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     auto view = vsg::ImageView::create(image, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -50,7 +50,9 @@ vsg::ref_ptr<vsg::ImageInfo> createImage(uint32_t width, uint32_t height, VkForm
     return vsg::ImageInfo::create(vsg::ref_ptr<vsg::Sampler>{}, view, VK_IMAGE_LAYOUT_GENERAL);
 }
 
-A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<IlluminationBuffer> illuBuffer, vsg::ref_ptr<AccumulationBuffer> accBuffer)
+A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
+               vsg::ref_ptr<IlluminationBuffer> illuBuffer, vsg::ref_ptr<AccumulationBuffer> accBuffer,
+               vsg::ref_ptr<GradientProjector> gradProjector)
     : width(width), height(height)
 {
     PerPass<const char*> shaderNames{"shaders/a-svgf/CreateGradientSamples.comp.spv",
@@ -73,7 +75,7 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
         {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -82,7 +84,7 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
         {11, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
         {13, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {14, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
 
     vsg::DescriptorSetLayoutBindings layoutBindings1 = {
@@ -117,22 +119,21 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
     diffB1 = createImage(gradWidth, gradHeight, VK_FORMAT_R32G32B32A32_SFLOAT);
     diffB2 = createImage(gradWidth, gradHeight, VK_FORMAT_R32G32B32A32_SFLOAT);
     accum_color = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT);
-    accum_color_prev = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT);
-    accum_moments = createImage(width, height, VK_FORMAT_R32G32_SFLOAT);
-    accum_moments_prev = createImage(width, height, VK_FORMAT_R32G32_SFLOAT);
-    accum_histlen = createImage(width, height, VK_FORMAT_R16_SFLOAT);
-    accum_histlen_prev = createImage(width, height, VK_FORMAT_R16_SFLOAT);
-    varA = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT);
-    varB = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT);
+    accum_moments = createImage(width, height, VK_FORMAT_R32G32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    accum_moments_prev = createImage(width, height, VK_FORMAT_R32G32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    accum_histlen = createImage(width, height, VK_FORMAT_R16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    accum_histlen_prev = createImage(width, height, VK_FORMAT_R16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    varA = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    varB = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    color_hist = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     vsg::Descriptors desc0 {
-        // TODO: find the correct inputs for the question-marked entries
-        vsg::DescriptorImage::create(/*unfiltered color?*/illuBuffer->illuminationImages[0]->imageInfoList, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(accBuffer->prevIllu->imageInfoList, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        vsg::DescriptorImage::create(/*gradient positions?*/accBuffer->motion->imageInfoList, 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(/*irradiance*/illuBuffer->illuminationImages[1]->imageInfoList, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(/*prev irrad*/accBuffer->prevIllu->imageInfoList, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        vsg::DescriptorImage::create(/*grad block sample xy*/gradProjector->gradientSamples->imageInfoList, 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(gBuffer->albedo->imageInfoList, 3, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(/*color?*/illuBuffer->illuminationImages[0]->imageInfoList, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(/*prev color? schied has color history buffer*/accBuffer->prevIllu->imageInfoList, 5, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        vsg::DescriptorImage::create(/*color*/illuBuffer->illuminationImages[0]->imageInfoList, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(color_hist, 5, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accBuffer->motion->imageInfoList, 6, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(gBuffer->depth->imageInfoList, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accBuffer->prevDepth->imageInfoList, 8, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
@@ -140,9 +141,8 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer, v
         vsg::DescriptorImage::create(accum_histlen_prev, 10, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(gBuffer->normal->imageInfoList, 11, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accBuffer->prevNormal->imageInfoList, 12, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
-        /*TODO: 13, 14: curr and prev VBuffer (mesh ids), below are dummy*/
-        vsg::DescriptorImage::create(gBuffer->material->imageInfoList, 13, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(gBuffer->material->imageInfoList, 14, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(gradProjector->mergedVisBuffer->imageInfoList, 13, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(gradProjector->prevVisBuffer->imageInfoList, 14, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
     };
 
     vsg::Descriptors desc1A {
@@ -240,22 +240,53 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
     }
 
     // 3. Temporal Accumulation
-    // TODO: double check mapping of prev accumulation textures.
     commandGraph->addChild(bindPipelines.tempAccum);
     commandGraph->addChild(bindDescriptorSet1A);
     commandGraph->addChild(vsg::Dispatch::create(tileWidth, tileHeight, 1));
+    commandGraph->addChild(pipelineBarrier);
 
     // 4. Estimate Variance
     commandGraph->addChild(bindPipelines.estVariance);
     commandGraph->addChild(vsg::Dispatch::create(tileWidth, tileHeight, 1));
+    commandGraph->addChild(pipelineBarrier);
 
-    // TODO: blit source to color history unfiltered (does not exist yet)
+    if (NumIterations == 0)
+    {
+        auto copyCmd = vsg::CopyImage::create();
+        copyCmd->srcImage = (DiffAtrousIterations & 1) ? varB->imageView->image : varA->imageView->image;
+        copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        copyCmd->dstImage = color_hist->imageView->image;
+        copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        copyCmd->regions = {VkImageCopy{
+                {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                {0, 0, 0},
+                {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                {0, 0, 0},
+                {width, height, 1}
+        }};
+        commandGraph->addChild(copyCmd);
+    }
 
     // 5. Atrous
     commandGraph->addChild(bindPipelines.atrous);
     for (int i = 0; i < NumIterations; i++)
     {
-        // TODO: blit to color history if (i-1)==HistoryTap
+        if (HistoryTap == i - 1)
+        {
+            auto copyCmd = vsg::CopyImage::create();
+            copyCmd->srcImage = ((DiffAtrousIterations + i) & 1) ? varB->imageView->image : varA->imageView->image;
+            copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            copyCmd->dstImage = color_hist->imageView->image;
+            copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            copyCmd->regions = {VkImageCopy{
+                    {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                    {0, 0, 0},
+                    {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                    {0, 0, 0},
+                    {width, height, 1}
+            }};
+            commandGraph->addChild(copyCmd);
+        }
 
         // swap the textures around each iteration.
         commandGraph->addChild(bindDescriptorSet1A);
@@ -274,7 +305,33 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
         commandGraph->addChild(pipelineBarrier);
     }
 
-    // TODO: blit to target?
+    // copy accum to prev
+    auto copyCmd = vsg::CopyImage::create();
+    copyCmd->srcImage = accum_histlen->imageView->image;
+    copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copyCmd->dstImage = accum_histlen_prev->imageView->image;
+    copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copyCmd->regions = {VkImageCopy{
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {width, height, 1}
+    }};
+    commandGraph->addChild(copyCmd);
+    copyCmd = vsg::CopyImage::create();
+    copyCmd->srcImage = accum_moments->imageView->image;
+    copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copyCmd->dstImage = accum_moments_prev->imageView->image;
+    copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copyCmd->regions = {VkImageCopy{
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {width, height, 1}
+    }};
+    commandGraph->addChild(copyCmd);
 }
 
 vsg::ref_ptr<vsg::DescriptorImage> A_SVGF::getFinalDescriptorImage() const
@@ -287,11 +344,247 @@ void A_SVGF::updateImageLayouts(vsg::Context &context)
     auto barr = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
 
     VkImageSubresourceRange rr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    // NOTE: does not contain accum_color_prev, as it is not initialized properly.
-    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_moments_prev, accum_histlen_prev, varA, varB})
+    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_moments_prev, accum_histlen_prev, varA, varB, color_hist})
     {
         barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0, img->imageView->image, rr));
     }
 
     context.commands.emplace_back(barr);
+}
+
+// clear command
+class ClearColorImage : public vsg::Inherit<vsg::Command, ClearColorImage>
+{
+public:
+    ClearColorImage() = default;
+
+    ClearColorImage(vsg::ref_ptr<vsg::Image> image, VkImageLayout layout, vsg::vec4 color)
+        : image(std::move(image)), layout(layout), value()
+    {
+        value.float32[0] = color[0];
+        value.float32[1] = color[1];
+        value.float32[2] = color[2];
+        value.float32[3] = color[3];
+        ranges.push_back(VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS});
+    }
+
+    ClearColorImage(vsg::ref_ptr<vsg::Image> image, VkImageLayout layout, vsg::uivec4 color)
+            : image(std::move(image)), layout(layout), value()
+    {
+        value.uint32[0] = color[0];
+        value.uint32[1] = color[1];
+        value.uint32[2] = color[2];
+        value.uint32[3] = color[3];
+        ranges.push_back(VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS});
+    }
+
+    vsg::ref_ptr<vsg::Image> image{};
+    VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkClearColorValue value{};
+    std::vector<VkImageSubresourceRange> ranges{};
+
+    void record(vsg::CommandBuffer &commandBuffer) const override
+    {
+        vkCmdClearColorImage(commandBuffer, image->vk(commandBuffer.deviceID), layout, &value, static_cast<uint32_t>(ranges.size()), ranges.data());
+    }
+};
+
+GradientProjector::GradientProjector(vsg::ref_ptr<VBuffer> vBuffer)
+    : width(vBuffer->width), height(vBuffer->height)
+{
+    auto image = vsg::Image::create();
+    image->imageType = VK_IMAGE_TYPE_2D;
+    image->format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    image->extent.width = width;
+    image->extent.height = height;
+    image->extent.depth = 1;
+    image->mipLevels = 1;
+    image->arrayLayers = 1;
+    image->samples = VK_SAMPLE_COUNT_1_BIT;
+    image->tiling = VK_IMAGE_TILING_OPTIMAL;
+    image->usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    image->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    auto imageView = vsg::ImageView::create(image, VK_IMAGE_ASPECT_COLOR_BIT);
+    auto imageInfo = vsg::ImageInfo::create(vsg::ref_ptr<vsg::Sampler>{}, imageView, VK_IMAGE_LAYOUT_GENERAL);
+    mergedVisBuffer = vsg::DescriptorImage::create(imageInfo, 3, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+    image = vsg::Image::create();
+    image->imageType = VK_IMAGE_TYPE_2D;
+    image->format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    image->extent.width = width;
+    image->extent.height = height;
+    image->extent.depth = 1;
+    image->mipLevels = 1;
+    image->arrayLayers = 1;
+    image->samples = VK_SAMPLE_COUNT_1_BIT;
+    image->tiling = VK_IMAGE_TILING_OPTIMAL;
+    image->usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    image->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageView = vsg::ImageView::create(image, VK_IMAGE_ASPECT_COLOR_BIT);
+    imageInfo = vsg::ImageInfo::create(vsg::Sampler::create(), imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    prevVisBuffer = vsg::DescriptorImage::create(imageInfo, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+    image = vsg::Image::create();
+    image->imageType = VK_IMAGE_TYPE_2D;
+    image->format = VK_FORMAT_R32_UINT;
+    image->extent.width = (width + GradientDownsample - 1) / GradientDownsample;
+    image->extent.height = (height + GradientDownsample - 1) / GradientDownsample;
+    image->extent.depth = 1;
+    image->mipLevels = 1;
+    image->arrayLayers = 1;
+    image->samples = VK_SAMPLE_COUNT_1_BIT;
+    image->tiling = VK_IMAGE_TILING_OPTIMAL;
+    image->usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    image->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageView = vsg::ImageView::create(image, VK_IMAGE_ASPECT_COLOR_BIT);
+    imageInfo = vsg::ImageInfo::create(vsg::ref_ptr<vsg::Sampler>{}, imageView, VK_IMAGE_LAYOUT_GENERAL);
+    gradientSamples = vsg::DescriptorImage::create(imageInfo, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+    auto shaderCreateImg = vsg::ShaderStage::read(VK_SHADER_STAGE_COMPUTE_BIT, "main", "shaders/a-svgf/GradientImg.comp.spv");
+    auto shaderProject = vsg::ShaderStage::read(VK_SHADER_STAGE_COMPUTE_BIT, "main", "shaders/a-svgf/GradientForwardProject.comp.spv");
+
+    shaderProject->specializationConstants = vsg::ShaderStage::SpecializationConstants{
+            {0, vsg::intValue::create(GradientDownsample)},
+            {1, vsg::intValue::create(width)},
+            {2, vsg::intValue::create(height)},
+    };
+
+    auto bindingMap = shaderProject->getDescriptorSetLayoutBindingsMap();
+    auto dsetLayout = vsg::DescriptorSetLayout::create(bindingMap.begin()->second.bindings);
+    auto descriptorSet = vsg::DescriptorSet::create(dsetLayout, vsg::Descriptors{
+        vsg::DescriptorImage::create(vBuffer->depthBuffer->imageInfoList[0], 0, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        prevVisBuffer,
+        vsg::DescriptorImage::create(vBuffer->visBuffer->imageInfoList[0], 2, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        mergedVisBuffer,
+        gradientSamples,
+    });
+    auto pipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{dsetLayout}, vsg::PushConstantRanges{
+        {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(GradientProjectPushConst)}
+    });
+    bindProject = vsg::BindComputePipeline::create(vsg::ComputePipeline::create(pipelineLayout, shaderProject));
+    bindDescriptorSetP = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, descriptorSet);
+
+    pipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{dsetLayout}, vsg::PushConstantRanges{});
+    bindCreateImg = vsg::BindComputePipeline::create(vsg::ComputePipeline::create(pipelineLayout, shaderCreateImg));
+    bindDescriptorSetCI = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, descriptorSet);
+}
+
+void GradientProjector::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
+{
+    auto barrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0);
+    // transition previous buffer
+    auto prevBufferBarrier = vsg::ImageMemoryBarrier::create(VK_ACCESS_MEMORY_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    prevBufferBarrier->image = prevVisBuffer->imageInfoList[0]->imageView->image;
+    prevBufferBarrier->subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier->add(prevBufferBarrier);
+    commandGraph->addChild(barrier);
+
+    auto copyCmd = vsg::CopyImage::create();
+    copyCmd->regions = {VkImageCopy{
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {width, height, 1}
+    }};
+    copyCmd->srcImage = mergedVisBuffer->imageInfoList[0]->imageView->image;
+    copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copyCmd->dstImage = prevVisBuffer->imageInfoList[0]->imageView->image;
+    copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    commandGraph->addChild(copyCmd);
+
+    commandGraph->addChild(ClearColorImage::create(gradientSamples->imageInfoList[0]->imageView->image, VK_IMAGE_LAYOUT_GENERAL, vsg::uivec4{0, 0, 0, 0}));
+
+    barrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
+    // transition previous buffer
+    prevBufferBarrier = vsg::ImageMemoryBarrier::create(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    prevBufferBarrier->image = prevVisBuffer->imageInfoList[0]->imageView->image;
+    prevBufferBarrier->subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier->add(prevBufferBarrier);
+    // data dependency barrier on current buffer
+    auto currBufferBarrier = vsg::ImageMemoryBarrier::create(VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+    currBufferBarrier->image = mergedVisBuffer->imageInfoList[0]->imageView->image;
+    currBufferBarrier->subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier->add(currBufferBarrier);
+    // data dependency barrier on gradient samples buffer
+    auto gradBufferBarrier = vsg::ImageMemoryBarrier::create(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+    gradBufferBarrier->image = gradientSamples->imageInfoList[0]->imageView->image;
+    gradBufferBarrier->subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier->add(gradBufferBarrier);
+    commandGraph->addChild(barrier);
+
+    commandGraph->addChild(bindCreateImg);
+    commandGraph->addChild(bindDescriptorSetCI);
+    commandGraph->addChild(vsg::Dispatch::create((width + 7) / 8, (height + 7) / 8, 1));
+
+    barrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
+    // data dependency barrier on current buffer
+    currBufferBarrier = vsg::ImageMemoryBarrier::create(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+    currBufferBarrier->image = mergedVisBuffer->imageInfoList[0]->imageView->image;
+    currBufferBarrier->subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier->add(currBufferBarrier);
+    commandGraph->addChild(barrier);
+
+    commandGraph->addChild(bindProject);
+    commandGraph->addChild(bindDescriptorSetP);
+    pushConstValue = vsg::Value<GradientProjectPushConst>::create(GradientProjectPushConst{
+        vsg::mat4(),
+        0
+    });
+    commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstValue));
+    auto gradWidth = (width + GradientDownsample - 1) / GradientDownsample, gradHeight = (height + GradientDownsample - 1) / GradientDownsample;
+    auto gradTileWidth = (gradWidth + 7) / 8, gradTileHeight = (gradHeight + 7) / 8;
+    commandGraph->addChild(vsg::Dispatch::create(gradTileWidth, gradTileHeight, 1));
+
+    barrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, 0);
+    // data dependency barrier on current buffer
+    currBufferBarrier = vsg::ImageMemoryBarrier::create(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL);
+    currBufferBarrier->image = mergedVisBuffer->imageInfoList[0]->imageView->image;
+    currBufferBarrier->subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier->add(currBufferBarrier);
+    commandGraph->addChild(barrier);
+}
+
+void GradientProjector::compile(vsg::Context& context)
+{
+    for (auto& desc : bindDescriptorSetCI->descriptorSet->descriptors)
+        desc->compile(context);
+    for (auto& desc : bindDescriptorSetP->descriptorSet->descriptors)
+        desc->compile(context);
+}
+
+void GradientProjector::updateImageLayouts(vsg::Context &context) const
+{
+    auto barr = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
+
+    VkImageSubresourceRange rr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0, mergedVisBuffer->imageInfoList[0]->imageView->image, rr));
+    barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, prevVisBuffer->imageInfoList[0]->imageView->image, rr));
+    barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0, gradientSamples->imageInfoList[0]->imageView->image, rr));
+
+    context.commands.emplace_back(barr);
+}
+
+void GradientProjector::updateDescriptor(vsg::BindDescriptorSet *descSet, const vsg::BindingMap &bindingMap) const
+{
+    int mergedIdx = vsg::ShaderStage::getSetBindingIndex(bindingMap, "merged_vbuf").second;
+    auto merged = vsg::DescriptorImage::create(mergedVisBuffer->imageInfoList, mergedIdx);
+    merged->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descSet->descriptorSet->descriptors.push_back(merged);
+}
+
+void GradientProjector::updatePushConstants(vsg::dmat4 projMatrixD, vsg::dmat4 viewMatrixD, unsigned int frameNum) {
+    vsg::mat4 projMatrix{projMatrixD};
+    vsg::mat4 viewMatrix{viewMatrixD};
+    pushConstValue->value().frameNum = frameNum;
+    vsg::mat4 normalizeMat(1.0f / (float)width, 0, 0, 0,
+                           0, 1.0f / (float)height, 0, 0,
+                           0, 0, 1, 0,
+                           0, 0, 0, 1);
+    pushConstValue->value().reprojectionMatrix = projMatrix * viewMatrix * inverse(prevViewMatrix) * inverse(prevProjMatrix) * normalizeMat;
+    prevProjMatrix = projMatrix;
+    prevViewMatrix = viewMatrix;
 }
