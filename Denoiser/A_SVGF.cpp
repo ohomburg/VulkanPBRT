@@ -305,6 +305,23 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
         commandGraph->addChild(pipelineBarrier);
     }
 
+    if (NumIterations > 0 && HistoryTap == NumIterations - 1)
+    {
+        auto copyCmd = vsg::CopyImage::create();
+        copyCmd->srcImage = ((DiffAtrousIterations + NumIterations) & 1) ? varB->imageView->image : varA->imageView->image;
+        copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        copyCmd->dstImage = color_hist->imageView->image;
+        copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        copyCmd->regions = {VkImageCopy{
+                {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                {0, 0, 0},
+                {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+                {0, 0, 0},
+                {width, height, 1}
+        }};
+        commandGraph->addChild(copyCmd);
+    }
+
     // copy accum to prev
     auto copyCmd = vsg::CopyImage::create();
     copyCmd->srcImage = accum_histlen->imageView->image;
