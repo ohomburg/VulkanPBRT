@@ -128,11 +128,11 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
     color_hist = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     vsg::Descriptors desc0 {
-        vsg::DescriptorImage::create(/*irradiance*/illuBuffer->illuminationImages[1]->imageInfoList, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(/*irradiance*/illuBuffer->illuminationImages[0]->imageInfoList, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(/*prev irrad*/accBuffer->prevIllu->imageInfoList, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
         vsg::DescriptorImage::create(/*grad block sample xy*/gradProjector->gradientSamples->imageInfoList, 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(gBuffer->albedo->imageInfoList, 3, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(/*color*/illuBuffer->illuminationImages[0]->imageInfoList, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(/*color*/illuBuffer->illuminationImages[ModulateAlbedo ? 1 : 0]->imageInfoList, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(color_hist, 5, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accBuffer->motion->imageInfoList, 6, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(gBuffer->depth->imageInfoList, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
@@ -353,7 +353,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
 
 vsg::ref_ptr<vsg::DescriptorImage> A_SVGF::getFinalDescriptorImage() const
 {
-    return vsg::DescriptorImage::create(varA, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    auto img = ((DiffAtrousIterations + NumIterations) & 1) ? varB : varA;
+    return vsg::DescriptorImage::create(img, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 }
 
 void A_SVGF::updateImageLayouts(vsg::Context &context)

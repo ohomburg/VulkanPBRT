@@ -85,7 +85,7 @@ public:
     void updateImageLayouts(vsg::Context& context);
 
     int   GradientDownsample = 3;
-    bool  ModulateAlbedo = false;
+    bool  ModulateAlbedo = true;
     int   NumIterations = 5;
     int   HistoryTap = 0;
     int   FilterKernel = 1;
