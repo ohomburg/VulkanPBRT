@@ -188,7 +188,7 @@ void atrous()
 
 void main()
 {
-	if(z_center.x > 0) { /* only filter foreground pixels */
+	if (z_center.x != 1.0) { /* only filter foreground pixels */
 		box3();
 	}
 

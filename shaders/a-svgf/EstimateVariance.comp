@@ -65,7 +65,7 @@ void main()
 			m += vec2(l, l * l);
 		}
 
-		vec3 n_center = imageLoad(tex_normal_curr, ipos).xyz;
+		vec3 n_center = uncompress_normal(imageLoad(tex_normal_curr, ipos).rg);
 		uint mesh_id_center = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
 
 		float sum_w = 1.0;
@@ -79,10 +79,10 @@ void main()
 					float l = luminance(c.rgb);
 
 					float z_p = abs(imageLoad(tex_vbuf_curr, p).x);
-					vec3 n_p = imageLoad(tex_normal_curr, p).xyz;
+					vec3 n_p = uncompress_normal(imageLoad(tex_normal_curr, p).rg);
 
 					float w_z = abs(z_p - z_center) / (delta_z * length(vec2(xx, yy)) + 1e-2);
-                    float w_n = pow(max(0, dot(n_p, n_center)), 128.0); 
+                    float w_n = pow(max(0, dot(n_p, n_center)), 128.0);
 
 					uint mesh_id_p = floatBitsToUint(imageLoad(tex_vbuf_curr, p).y);
 
@@ -101,7 +101,7 @@ void main()
 
 		m /= sum_w;
 		c.rgb /= sum_w;
-			
+
 		moments_spatial = m;
 		color_spatial = c.rgb;
 

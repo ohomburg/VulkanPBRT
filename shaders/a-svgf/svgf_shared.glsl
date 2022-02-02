@@ -1,4 +1,5 @@
-#if 0
+/*
+Modifications Copyright 2022 Oskar Homburg
 
 Copyright (c) 2018, Christoph Schied
 All rights reserved.
@@ -24,24 +25,29 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
 
-#endif
+vec3 uncompress_normal(vec2 comp)
+{
+    vec3 n;
+    n.x = cos(comp.y) * sin(comp.x);
+    n.y = sin(comp.y) * sin(comp.x);
+    n.z = cos(comp.x);
+    return n;
+}
 
-bool
-test_reprojected_normal(vec3 n1, vec3 n2)
+bool test_reprojected_normal(vec3 n1, vec3 n2)
 {
 	return dot(n1, n2) > 0.95;
 }
 
-bool
-test_inside_screen(ivec2 p, ivec2 res)
+bool test_inside_screen(ivec2 p, ivec2 res)
 {
 	return all(greaterThanEqual(p, ivec2(0)))
 		&& all(lessThan(p, res));
 }
 
-bool
-test_reprojected_depth(float z1, float z2, float dz)
+bool test_reprojected_depth(float z1, float z2, float dz)
 {
 	float z_diff = abs(z1 - z2);
 	return z_diff < 2.0 * (dz + 1e-3);
@@ -50,8 +56,7 @@ test_reprojected_depth(float z1, float z2, float dz)
 #define TILE_OFFSET_SHIFT 3u
 #define TILE_OFFSET_MASK ((1 << TILE_OFFSET_SHIFT) - 1)
 
-ivec2
-get_gradient_tile_pos(uint idx, int gradientDownsample)
+ivec2 get_gradient_tile_pos(uint idx, int gradientDownsample)
 {
 	/* didn't store a gradient sample in the previous frame, this creates
 	   a new sample in the center of the tile */
@@ -61,14 +66,12 @@ get_gradient_tile_pos(uint idx, int gradientDownsample)
 	return ivec2((idx & TILE_OFFSET_MASK), (idx >> TILE_OFFSET_SHIFT) & TILE_OFFSET_MASK);
 }
 
-uint
-get_gradient_idx_from_tile_pos(ivec2 pos)
+uint get_gradient_idx_from_tile_pos(ivec2 pos)
 {
 	return (1 << 31) | (pos.x) | (pos.y << TILE_OFFSET_SHIFT);
 }
 
-bool
-is_gradient_sample(uimage2D tex_gradient, ivec2 ipos, int gradientDownsample)
+bool is_gradient_sample(uimage2D tex_gradient, ivec2 ipos, int gradientDownsample)
 {
 	ivec2 ipos_grad = ipos / gradientDownsample;
 	uint u = imageLoad(tex_gradient, ipos_grad).r;

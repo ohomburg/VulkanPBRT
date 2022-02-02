@@ -60,7 +60,7 @@ void main()
 
     float z_curr       = abs(imageLoad(tex_vbuf_curr, ipos).x);
 	vec3  color_curr   = imageLoad(tex_color,       ipos).rgb;
-	vec3  normal_curr  = imageLoad(tex_normal_curr, ipos).rgb;
+	vec3  normal_curr  = uncompress_normal(imageLoad(tex_normal_curr, ipos).rg);
 	float l            = luminance(color_curr);
 	vec2  moments_curr = vec2(l, l * l);
 	uint  mesh_id_curr = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
@@ -74,7 +74,7 @@ void main()
 		for (int xx = 0; xx <= 1; xx++) {
 			ivec2 ipos_prev    = p + ivec2(xx, yy);
 			float z_prev       = abs(texelFetch(tex_vbuf_prev, ipos_prev, 0).x);
-			vec3  normal_prev  = texelFetch(tex_normal_prev, ipos_prev, 0).rgb;
+			vec3  normal_prev  = uncompress_normal(texelFetch(tex_normal_prev, ipos_prev, 0).rg);
 			uint mesh_id_prev  = floatBitsToUint(texelFetch(tex_vbuf_prev, ipos_prev, 0).y);
 
 			bool accept = true;
@@ -90,7 +90,6 @@ void main()
 				moments_prev += imageLoad(tex_moments_prev,   ipos_prev).rg * w;
 				histlen      += imageLoad(tex_history_length, ipos_prev).r  * w;
 				sum_w        += w;
-
 			}
 		}
 	}
@@ -132,7 +131,6 @@ void main()
 		color_prev   /= sum_w;
 		moments_prev /= sum_w;
 		histlen      /= sum_w;
-
 
 #ifndef ANTILAG
 		const float alpha_color   = max(temporal_alpha, 1.0 / (histlen + 1.0));
