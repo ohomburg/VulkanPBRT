@@ -53,7 +53,7 @@ void main()
 	ivec2 ipos   = ivec2(gl_GlobalInvocationID.xy);
 	ivec2 size   = imageSize(tex_motion).rg;
 
-	vec2 pos_prev = imageLoad(tex_motion, ipos).rg;
+	vec2 pos_prev = imageLoad(tex_motion, ipos).rg * size;
 
 	ivec2 p = ivec2(pos_prev - 0.5);
 	vec2  w = (pos_prev - 0.5) - floor(pos_prev - 0.5);
@@ -83,7 +83,7 @@ void main()
 			accept = accept && abs(z_curr - z_prev) < 0.01;
 			accept = accept && mesh_id_prev == mesh_id_curr;
 
-			if(accept) {
+			if (accept) {
 				float w = (xx == 0 ? (1.0 - w.x) : w.x)
 					    * (yy == 0 ? (1.0 - w.y) : w.y);
 				color_prev   += imageLoad(tex_color_prev,     ipos_prev) * w;
@@ -94,6 +94,8 @@ void main()
 			}
 		}
 	}
+	if (pos_prev.x < 0 || pos_prev.y < 0)
+	    sum_w = 0;
 
 #ifdef ANTILAG
 	float antilag_alpha = 0.0;
@@ -126,7 +128,7 @@ void main()
 
 #endif
 
-	if (sum_w > 0.01) { /* found sufficiently reliable history information */
+	if (sum_w > 0.01 && !any(isnan(color_prev))) { /* found sufficiently reliable history information */
 		color_prev   /= sum_w;
 		moments_prev /= sum_w;
 		histlen      /= sum_w;

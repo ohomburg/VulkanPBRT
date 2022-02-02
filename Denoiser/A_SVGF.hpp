@@ -89,7 +89,7 @@ public:
     int   NumIterations = 5;
     int   HistoryTap = 0;
     int   FilterKernel = 1;
-    float TemporalAlpha = 0.9f;
+    float TemporalAlpha = 0.1f;
     int   DiffAtrousIterations = 5;
     int   GradientFilterRadius = 2;
     bool  NormalizeGradient = true;
