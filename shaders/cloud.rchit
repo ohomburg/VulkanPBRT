@@ -4,9 +4,11 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 #include "ptStructures.glsl"
+#include "ptConstants.glsl"
 #include "layoutPTAccel.glsl"
 #include "random.glsl"
 #include "layoutPTPushConstants.glsl"
+#include "color.glsl"
 
 layout(location = 1) rayPayloadInEXT RayPayload rayPayload;
 layout(binding = 12) buffer Lights{Light l[]; } lights;
@@ -111,6 +113,7 @@ vec3 ImportanceSamplePhase(float GFactor, vec3 D, out float pdf, inout RandomEng
 //--- Tools
 
 vec3 sampleLight(in vec3 dir){
+    return vec3(0);
 	int N = 10;
 	float phongNorm = (N + 2) / (2 * 3.14159);
 	return parameters.sun_intensity * pow(max(0, dot(dir, parameters.sun_direction)), N) * phongNorm;
@@ -157,35 +160,14 @@ struct ScatterEvent
 };
 
 // TODO: this should be covered by a miss shader/recursive RT
-vec3 sampleSkybox(in vec3 dir)
+vec3 sampleSkybox(vec3 direction)
 {
-    vec3 L = dir;
-
-    vec3 BG_COLORS[5] =
-	{
-		vec3(0.1f, 0.05f, 0.01f), // GROUND DARKER BLUE
-		vec3(0.01f, 0.05f, 0.2f), // HORIZON GROUND DARK BLUE
-		vec3(0.8f, 0.9f, 1.0f), // HORIZON SKY WHITE
-		vec3(0.1f, 0.3f, 1.0f),  // SKY LIGHT BLUE
-		vec3(0.01f, 0.1f, 0.7f)  // SKY BLUE
-	};
-
-	float BG_DISTS[5] =
-	{
-		-1.0f,
-		-0.1f,
-		0.0f,
-		0.4f,
-		1.0f
-	};
-
-	vec3 col = BG_COLORS[0];
-	col = mix(col, BG_COLORS[1], vec3(smoothstep(BG_DISTS[0], BG_DISTS[1], L.y)));
-	col = mix(col, BG_COLORS[2], vec3(smoothstep(BG_DISTS[1], BG_DISTS[2], L.y)));
-	col = mix(col, BG_COLORS[3], vec3(smoothstep(BG_DISTS[2], BG_DISTS[3], L.y)));
-	col = mix(col, BG_COLORS[4], vec3(smoothstep(BG_DISTS[3], BG_DISTS[4], L.y)));
-
-	return col;
+    direction = normalize(gl_ObjectToWorldEXT * vec4(direction, 0));
+	vec3 upper_color = SRGBtoLINEAR(vec3(0.3, 0.5, 0.92));
+	upper_color = mix(vec3(1), upper_color, max(direction.z, 0));
+	vec3 lower_color = vec3(0.2, 0.2, 0.2);
+	float weight = smoothstep(-0.02, 0.02, direction.z);
+	return mix(lower_color, upper_color, weight);
 }
 
 // Pathtracing with Delta tracking and Spectral tracking
@@ -344,7 +326,7 @@ void main()
     rayPayload.si.reflectance90 = vec3(0);
     rayPayload.si.diffuseColor = vec3(0);
     rayPayload.si.specularColor = vec3(0);
-    rayPayload.si.normal = vec3(1);
+    rayPayload.si.normal = vec3(-1);
     rayPayload.si.basis = mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
 
