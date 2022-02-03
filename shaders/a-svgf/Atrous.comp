@@ -217,7 +217,11 @@ void main()
 	vec4 frag_color      = vec4(sum_color, sum_variance);
 
 	if(modulate_albedo > 0) {
-		frag_color.rgb *= imageLoad(tex_albedo, ipos).rgb;
+	    // DANGER: keep the constant in with the epsilon added on demodulation
+		frag_color.rgb *= imageLoad(tex_albedo, ipos).rgb + vec3(1e-6);
+		// tone mapping
+        frag_color.rgb = LINEARtoSRGB(vec4(frag_color.rgb, 1)).xyz;
+        frag_color.rgb = clamp(frag_color.rgb, vec3(0), vec3(1));
 	}
 
 	imageStore(img_varianceB, ipos, frag_color);

@@ -51,3 +51,9 @@ yuv_to_rgb(vec3 yuv)
 		0.0,     -0.39465, 2.03211,
 		1.13983, -0.58060, 0.0) * yuv;
 }
+
+vec4 LINEARtoSRGB(vec4 srgbIn)
+{
+    vec3 linOut = pow(srgbIn.xyz, vec3(1.0 / 2.2));
+    return vec4(linOut, srgbIn.w);
+}
