@@ -49,7 +49,8 @@ vsg::ref_ptr<vsg::Object> xyz::read(std::istream& fin, vsg::ref_ptr<const vsg::O
     std::vector<float> raw_data(static_cast<size_t>(sizeX * sizeY * sizeZ), 0.0f);
     fin.read(reinterpret_cast<char *>(raw_data.data()), sizeof(float) * raw_data.size());
 
-    auto data = vsg::floatArray3D::create(sizeX, sizeY, sizeZ, vsg::Data::Layout{ VK_FORMAT_R32_SFLOAT });
+    // swap y/z to convert coordinate systems
+    auto data = vsg::floatArray3D::create(sizeX, sizeZ, sizeY, vsg::Data::Layout{ VK_FORMAT_R32_SFLOAT });
     size_t i = 0;
     float maxVal = 0;
 
@@ -61,7 +62,8 @@ vsg::ref_ptr<vsg::Object> xyz::read(std::istream& fin, vsg::ref_ptr<const vsg::O
             for (uint32_t z = 0; z < sizeZ; z++)
             {
                 float d = raw_data[i++];
-                data->at(x, y, z) = d;
+                // swap y/z again
+                data->at(x, z, y) = d;
                 if (d > maxVal) maxVal = d;
             }
         }
@@ -81,9 +83,10 @@ vsg::ref_ptr<vsg::Object> xyz::read(std::istream& fin, vsg::ref_ptr<const vsg::O
     vol->box.maxX = vol->box.maxY = vol->box.maxZ = 1.0f;
 
     auto& mat = container->matrix;
+    // swap y/z here as well
     mat(0, 0) = static_cast<float>(voxelSizeX * sizeX);
-    mat(1, 1) = static_cast<float>(voxelSizeY * sizeY);
-    mat(2, 2) = static_cast<float>(voxelSizeZ * sizeZ);
+    mat(1, 1) = static_cast<float>(voxelSizeZ * sizeZ);
+    mat(2, 2) = static_cast<float>(voxelSizeY * sizeY);
 
     container->addChild(vol);
     return container;
