@@ -52,8 +52,7 @@ void main(){
     #endif
     #endif
     createRay(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, antiAlias, re, worldSpacePos, worldSpaceDir);
-    // TODO: possible optimization: take known intersection depth from VBuffer if available. Currently impossible due to
-    // volumetrics not writing to VBuffer.
+    // TODO: possible optimization: take known intersection depth from VBuffer if available.
     traceRayEXT(tlas, rayFlags, cullMask, 0, 0, 0, worldSpacePos.xyz, tmin, worldSpaceDir.xyz, tmax, 1);
     vec3 finalColor = vec3(0);
     finalColor += nextEventEsitmation(rayPayload.position, -normalize(worldSpaceDir.xyz), rayPayload.si, throughput, re);
