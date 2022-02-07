@@ -66,7 +66,7 @@ void main(){
 	// storing GBuffer information
 	// --------------------------------------------------------------------
 	vec3 curAlbedo = (rayPayload.si.diffuseColor + rayPayload.si.specularColor).xyz;
-	if (abs(rayPayload.si.normal) == vec3(1)) curAlbedo = GetSkyColor(worldSpaceDir.xyz);
+	if (abs(rayPayload.si.normal) == vec3(1)) curAlbedo = vec3(1);
 	float depth = distance(rayPayload.position, worldSpacePos.xyz);
 	vec3 curNorm = rayPayload.si.normal;
 #ifdef GBUFFER
@@ -109,7 +109,7 @@ void main(){
 			vec3 prevNor;
 			prevNor.xy = texture(prevNormal, prevPos.xy).xy;
 			prevNor = vec3(sin(prevNor.x) * cos(prevNor.y), sin(prevNor.x) * sin(prevNor.y), cos(prevNor.x));
-			if(abs(dot(rayPayload.si.normal, prevNor)) > .1f){	//we do have a point which can be reprojected
+			if(abs(rayPayload.si.normal) != vec3(1) && abs(dot(rayPayload.si.normal, prevNor)) > .1f){	//we do have a point which can be reprojected
 				reprojected = true;
 			#ifdef DEMOD_ILLUMINATION
 				prevColor = texture(prevOutput, prevPos.xy).xyz;
