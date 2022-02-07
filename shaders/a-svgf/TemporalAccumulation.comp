@@ -37,6 +37,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "layout.glsl"
 
+const uint MAX_HISTLEN = 64;
+
 #ifdef ANTILAG
 #error "not yet ported"
 sampler2D tex_diff_current;
@@ -146,12 +148,12 @@ void main()
 		imageStore(img_antilag_alpha, ipos, vec4(viridis_quintic(alpha_color), 0.0));
   #endif
 #endif
-		imageStore(img_accumulated, ipos, vec4(mix(color_prev.rgb, color_curr, alpha_color), min(64, histlen + 1.0)));
+		imageStore(img_accumulated, ipos, vec4(mix(color_prev.rgb, color_curr, alpha_color), min(MAX_HISTLEN, histlen + 1.0)));
 		imageStore(img_moments, ipos, vec4(mix(moments_prev, moments_curr, alpha_moments), 0, 0));
 		#ifdef ANTILAG
-		imageStore(img_histlen, ipos, vec4(clamp(1.0 / alpha_color, 0.0, 64.0)));
+		imageStore(img_histlen, ipos, vec4(clamp(1.0 / alpha_color, 0.0, float(MAX_HISTLEN))));
 		#else
-		imageStore(img_histlen, ipos, vec4(min(64, histlen + 1.0)));
+		imageStore(img_histlen, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0)));
 		#endif
 	}
 	else
