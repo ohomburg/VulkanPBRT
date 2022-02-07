@@ -88,6 +88,7 @@ class VBufferRenderVisitor : public vsg::Visitor
 {
     vsg::MatrixStack transform;
     uint32_t meshId = 1;
+    uint32_t volId = 0x8000'0001;
 
     struct PushConst
     {
@@ -125,11 +126,23 @@ public:
         commands->addChild(pushConst);
         commands->addChild(vsg::ref_ptr(&draw));
         meshId += draw.instanceCount;
+        if (meshId > 0x8000'0000) throw vsg::Exception{"Too many mesh ids used!"};
     }
 
     void apply(vsg::Volumetric &volumetric) override
     {
-        // TODO: figure out what to do with volumes
+        auto pushVal = PushConstValue::create();
+        auto modelMat = vsg::transpose(transform.top());
+        for (size_t i = 0; i < 12; i++)
+            pushVal->value().matModel3x4[i] = (float)modelMat.data()[i];
+        pushVal->value().meshId = volId;
+        auto pushConst = vsg::PushConstants::create(VK_SHADER_STAGE_VERTEX_BIT, 64, pushVal);
+        commands->addChild(pushConst);
+        auto draw = vsg::VertexIndexDraw::create();
+        draw->assignArrays(vsg::DataList{vsg::floatArray::create({0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1})});
+        draw->assignIndices(vsg::ushortArray::create({0,4,1,1,4,5, 4,6,5,5,6,7, 1,5,3,3,5,7, 0,2,4,4,2,6, 0,1,2,2,1,3, 2,3,6,6,3,7}));
+        commands->addChild(draw);
+        volId++;
     }
 };
 
