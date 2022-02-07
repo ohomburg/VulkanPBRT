@@ -20,4 +20,4 @@ void createRay(uvec2 pixelPos, uvec2 imSize, bool antiAlias,inout RandomEngine r
     dir = camParams.inverseViewMatrix * vec4(normalize(dir.xyz), 0) ;
 }
 
-#endif //CAMEAR_H
+#endif //CAMERA_H
