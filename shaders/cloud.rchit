@@ -119,11 +119,12 @@ vec3 sampleLight(in vec3 dir){
 	return parameters.sun_intensity * pow(max(0, dot(dir, parameters.sun_direction)), N) * phongNorm;
 }
 
+ivec3 imgDims = textureSize(gridImage[gl_InstanceCustomIndexEXT], 0);
+
 float sampleCloud(in vec3 pos, inout RandomEngine re)
 {
-    ivec3 dim = textureSize(gridImage[gl_InstanceCustomIndexEXT], 0);
     vec3 coord = pos;
-    coord += vec3(randomFloat(re) - 0.5, randomFloat(re) - 0.5, randomFloat(re) - 0.5)/ dim;
+    coord += vec3(randomFloat(re) - 0.5, randomFloat(re) - 0.5, randomFloat(re) - 0.5) / imgDims;
     return textureLod(gridImage[gl_InstanceCustomIndexEXT], coord, 0).x;
 }
 
