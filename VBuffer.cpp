@@ -141,6 +141,8 @@ public:
         auto draw = vsg::VertexIndexDraw::create();
         draw->assignArrays(vsg::DataList{vsg::floatArray::create({0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1})});
         draw->assignIndices(vsg::ushortArray::create({0,4,1,1,4,5, 4,6,5,5,6,7, 1,5,3,3,5,7, 0,2,4,4,2,6, 0,1,2,2,1,3, 2,3,6,6,3,7}));
+        draw->instanceCount = 1;
+        draw->indexCount = 36;
         commands->addChild(draw);
         volId++;
     }
