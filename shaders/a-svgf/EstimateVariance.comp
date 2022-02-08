@@ -69,7 +69,8 @@ void main()
 		uint mesh_id_center = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
 
 		float sum_w = 1.0;
-		const int r = histlen > 1 ? 2 : 3;
+		int r = histlen > 1 ? 2 : 3;
+		//if (mesh_id_center == 0) r = 0; // do not filter skybox, TODO: does not work
 		for(int yy = -r; yy <= r; yy++) {
 			for(int xx = -r; xx <= r; xx++) {
 				if(xx != 0 || yy != 0) {

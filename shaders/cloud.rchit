@@ -317,7 +317,7 @@ void main()
     ScatterEvent first_event;
     vec3 result = Pathtrace(x, w, first_event, re);
 
-    rayPayload.position = x;
+    rayPayload.position = first_event.hasValue ? (gl_ObjectToWorldEXT * vec4(first_event.x, 1)) : vec3(1/0);
     rayPayload.si.emissiveColor = result;
 
     rayPayload.si.perceptualRoughness = 0;
