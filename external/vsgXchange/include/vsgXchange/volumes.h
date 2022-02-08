@@ -36,12 +36,14 @@ namespace vsgXchange
     class xyz : public vsg::Inherit<vsg::ReaderWriter, xyz>
     {
     public:
-        xyz();
+        xyz(bool use16bit = false);
 
         vsg::ref_ptr<vsg::Object> read(const vsg::Path& filename, vsg::ref_ptr<const vsg::Options> options = {}) const override;
         vsg::ref_ptr<vsg::Object> read(std::istream& fin, vsg::ref_ptr<const vsg::Options> options = {}) const override;
 
         bool getFeatures(Features& features) const override;
+    private:
+        bool use16bit;
     };
 } // namespace vsgXchange
 

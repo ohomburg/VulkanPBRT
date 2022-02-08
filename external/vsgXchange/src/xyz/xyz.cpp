@@ -18,7 +18,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 using namespace vsgXchange;
 
-xyz::xyz() = default;
+xyz::xyz(bool use16bit) : use16bit(use16bit) {}
 
 bool xyz::getFeatures(Features& features) const
 {
@@ -31,6 +31,25 @@ vsg::ref_ptr<vsg::Object> xyz::read(const vsg::Path& filename, vsg::ref_ptr<cons
     vsg::Path filenameToUse = vsg::findFile(filename, options);
     std::ifstream file(filenameToUse, std::ifstream::in | std::ifstream::binary);
     return xyz::read(file, options);
+}
+
+uint32_t floatToBits(float f)
+{
+    uint32_t ret;
+    std::memcpy(&ret, &f, sizeof(float));
+    return ret;
+}
+
+uint16_t floatToHalf(float f)
+{
+    auto bits = floatToBits(f);
+    uint16_t sign = (bits >> 16) & 0x8000;
+    int exp = int((bits >> 23) & 0xFF) - 127;
+    uint16_t m = (bits >> 13) & 0x3FF; // FIXME: inaccurate, always rounds down
+    uint16_t expb = uint16_t(exp + 15) << 10;
+    if (exp > 15) { m = 0; expb = 31; } // inf
+    if (exp < -14) { m = 0; expb = 0; } // subnormal -> zero
+    return sign | expb | m;
 }
 
 vsg::ref_ptr<vsg::Object> xyz::read(std::istream& fin, vsg::ref_ptr<const vsg::Options> options) const
@@ -71,14 +90,21 @@ vsg::ref_ptr<vsg::Object> xyz::read(std::istream& fin, vsg::ref_ptr<const vsg::O
 
     // normalize data
     float rcpMaxVal = 1.0f / maxVal;
-    for (float& d : *data)
+    vsg::ref_ptr<vsg::ushortArray3D> data16;
+    if (use16bit) data16 = vsg::ushortArray3D::create(sizeX, sizeZ, sizeY, vsg::Data::Layout{ VK_FORMAT_R16_SFLOAT });
+    for (size_t j = 0; j < data->size(); j++)
     {
-        d *= rcpMaxVal;
+        data->at(j) *= rcpMaxVal;
+        if (use16bit)
+            data16->at(j) = floatToHalf(data->at(j));
     }
 
     auto container = vsg::MatrixTransform::create();
     auto vol = vsg::Volumetric::create();
-    vol->voxels = data;
+    if (use16bit)
+        vol->voxels = data16;
+    else
+        vol->voxels = data;
     vol->box.minX = vol->box.minY = vol->box.minZ = 0;
     vol->box.maxX = vol->box.maxY = vol->box.maxZ = 1.0f;
 
