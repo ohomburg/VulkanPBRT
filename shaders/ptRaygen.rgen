@@ -127,6 +127,12 @@ void main(){
 		imageStore(motion, ivec2(gl_LaunchIDEXT.xy), vec4(-1));
 	}
 	imageStore(sampleCounts, ivec2(gl_LaunchIDEXT.xy), vec4(pixelSpp));
+
+	if (rayPayload.si.normal == vec3(-1))
+	{
+	    // store stats
+	    imageStore(volumeImage, ivec2(gl_LaunchIDEXT.xy), vec4(rayPayload.si.reflectance0.xy, 0, 0));
+    }
 #endif
 
     // --------------------------------------------------------------------

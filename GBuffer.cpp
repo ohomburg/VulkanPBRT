@@ -15,11 +15,14 @@ void GBuffer::updateDescriptor(vsg::BindDescriptorSet* descSet, const vsg::Bindi
     material->dstBinding = materialInd;
     int albedoInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "albedoImage").second;
     albedo->dstBinding = albedoInd;
+    int volumeInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "volumeImage").second;
+    volume->dstBinding = volumeInd;
 
     descSet->descriptorSet->descriptors.push_back(depth);
     descSet->descriptorSet->descriptors.push_back(normal);
     descSet->descriptorSet->descriptors.push_back(material);
     descSet->descriptorSet->descriptors.push_back(albedo);
+    descSet->descriptorSet->descriptors.push_back(volume);
 }
 void GBuffer::updateImageLayouts(vsg::Context& context)
 {
@@ -36,10 +39,13 @@ void GBuffer::updateImageLayouts(vsg::Context& context)
     auto albedoLayout = vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
                                                         VK_IMAGE_LAYOUT_GENERAL, 0, 0, albedo->imageInfoList[0]->imageView->image,
                                                         resourceRange);
+    auto volumeLayout = vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+                                                        VK_IMAGE_LAYOUT_GENERAL, 0, 0, volume->imageInfoList[0]->imageView->image,
+                                                        resourceRange);
 
     auto pipelineBarrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
                                                         VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_DEPENDENCY_BY_REGION_BIT,
-                                                        depthLayout, normalLayout, materialLayout, albedoLayout);
+                                                        depthLayout, normalLayout, materialLayout, albedoLayout, volumeLayout);
     context.commands.push_back(pipelineBarrier);
 }
 void GBuffer::compile(vsg::Context& context)
@@ -48,6 +54,7 @@ void GBuffer::compile(vsg::Context& context)
     normal->compile(context);
     material->compile(context);
     albedo->compile(context);
+    volume->compile(context);
 }
 void GBuffer::setupImages()
 {
@@ -121,4 +128,21 @@ void GBuffer::setupImages()
     imageView = vsg::ImageView::create(image, VK_IMAGE_ASPECT_COLOR_BIT);
     imageInfo = vsg::ImageInfo::create(vsg::ref_ptr<vsg::Sampler>{}, imageView, VK_IMAGE_LAYOUT_GENERAL);
     albedo = vsg::DescriptorImage::create(imageInfo, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+    image = vsg::Image::create();
+    image->imageType = VK_IMAGE_TYPE_2D;
+    image->format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    image->extent.width = width;
+    image->extent.height = height;
+    image->extent.depth = 1;
+    image->mipLevels = 1;
+    image->arrayLayers = 1;
+    image->samples = VK_SAMPLE_COUNT_1_BIT;
+    image->tiling = VK_IMAGE_TILING_OPTIMAL;
+    image->usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+    image->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image->sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageView = vsg::ImageView::create(image, VK_IMAGE_ASPECT_COLOR_BIT);
+    imageInfo = vsg::ImageInfo::create(vsg::ref_ptr<vsg::Sampler>{}, imageView, VK_IMAGE_LAYOUT_GENERAL);
+    volume = vsg::DescriptorImage::create(imageInfo, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 }

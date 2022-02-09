@@ -11,7 +11,7 @@ public:
     GBuffer(uint32_t width, uint32_t height);
 
     uint32_t width, height;
-    vsg::ref_ptr<vsg::DescriptorImage> depth, normal, material, albedo;
+    vsg::ref_ptr<vsg::DescriptorImage> depth, normal, material, albedo, volume;
 
     void updateDescriptor(vsg::BindDescriptorSet* descSet, const vsg::BindingMap& bindingMap);
 

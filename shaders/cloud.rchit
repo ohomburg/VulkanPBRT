@@ -306,6 +306,32 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine 
     return ( sampleSkybox(w) + sampleLight(w) );
 }
 
+vec2 GetPrimaryStats(vec3 x, vec3 w)
+{
+    // Ray march to get transmittance-weighted depth
+    const uint STEPS = 16;
+    float tMin, tMax;
+    rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax);
+    x += tMin * w;
+    vec3 delta = w * (tMax - tMin);
+    float mean = 0, var = 0;
+    float trans = 1;
+    float sum_w = 0;
+    for (uint i = 0; i < STEPS; i++)
+    {
+        vec3 loc = x + i * delta;
+        float d = distance(gl_ObjectToWorldEXT * vec4(loc, 1), gl_WorldRayOriginEXT); // TODO: unoptimized poop
+        trans *= exp(textureLod(gridImage[gl_InstanceCustomIndexEXT], loc, 0).x);
+        mean += d * trans;
+        var += d * d * trans;
+        sum_w += trans;
+    }
+    mean /= sum_w;
+    var -= mean;
+    var /= sum_w;
+    return vec2(mean, var);
+}
+
 void main()
 {
     RandomEngine re = rEInit(gl_LaunchIDEXT.xy, camParams.frameNumber);
@@ -316,6 +342,7 @@ void main()
     // Perform a single path and get radiance
     ScatterEvent first_event;
     vec3 result = Pathtrace(x, w, first_event, re);
+    vec2 stats = GetPrimaryStats(x, w);
 
     rayPayload.position = first_event.hasValue ? (gl_ObjectToWorldEXT * vec4(first_event.x, 1)) : vec3(1/0);
     rayPayload.si.emissiveColor = result;
@@ -323,7 +350,7 @@ void main()
     rayPayload.si.perceptualRoughness = 0;
     rayPayload.si.metalness = 0;
     rayPayload.si.alphaRoughness = 0;
-    rayPayload.si.reflectance0 = vec3(0);
+    rayPayload.si.reflectance0 = vec3(stats, 0); // re-using reflectance
     rayPayload.si.reflectance90 = vec3(0);
     rayPayload.si.diffuseColor = vec3(0);
     rayPayload.si.specularColor = vec3(0);
