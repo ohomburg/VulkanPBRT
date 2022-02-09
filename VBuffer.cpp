@@ -39,7 +39,7 @@ VBuffer::VBuffer(uint32_t width, uint32_t height)
         vsg::MultisampleState::create(), // default settings
         vsg::DepthStencilState::create(), // default settings
         vsg::ColorBlendState::create(vsg::ColorBlendState::ColorBlendAttachments{{
-            VkPipelineColorBlendAttachmentState{VK_FALSE}
+            VkPipelineColorBlendAttachmentState{VK_FALSE, {}, {}, {}, {}, {}, {}, VkColorComponentFlagBits::VK_COLOR_COMPONENT_R_BIT}
         }}),
         vsg::ViewportState::create(0, 0, width, height),
     };
