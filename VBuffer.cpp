@@ -191,7 +191,11 @@ void VBuffer::compile(vsg::Context &context) {
     renderGraph->renderArea = {0, 0, width, height};
     VkClearValue depthClear, visClear;
     depthClear.depthStencil.depth = 1.0f;
+    depthClear.depthStencil.stencil = 0;
     visClear.color.uint32[0] = 0;
+    visClear.color.uint32[1] = 0;
+    visClear.color.uint32[2] = 0;
+    visClear.color.uint32[3] = 0;
     renderGraph->clearValues = {depthClear, visClear};
     if (commands) renderGraph->addChild(commands);
 }
