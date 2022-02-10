@@ -11,7 +11,7 @@ private:
     int width, height;
 public:
     // Always takes the first image in the illumination buffer and accumulates it
-    Accumulator(vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, bool separateMatrices, int workWidth = 16, int workHeight = 16);
+    Accumulator(vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, bool separateMatrices, float blendAlpha = 0.1f, int workWidth = 16, int workHeight = 16);
 
     void compileImages(vsg::Context &context);
     void updateImageLayouts(vsg::Context &context);

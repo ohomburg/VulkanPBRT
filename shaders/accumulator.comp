@@ -28,7 +28,7 @@ layout(push_constant) uniform PushConstants
 
 layout (local_size_x_id = 0,local_size_y_id = 1,local_size_z=1) in;
 
-const float BLEND_ALPHA = .1;
+layout (constant_id = 2) const float BLEND_ALPHA = .1;
 
 void main(){
     ivec2 imageSize = textureSize(srcImage, 0);

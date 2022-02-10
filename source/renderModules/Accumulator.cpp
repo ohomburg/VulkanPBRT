@@ -1,7 +1,7 @@
 #include <renderModules/Accumulator.hpp>
 #include <vsgXchange/glsl.h>
 
-Accumulator::Accumulator(vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, bool separateMatrices, int workWidth, int workHeight):
+Accumulator::Accumulator(vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, bool separateMatrices, float blendAlpha, int workWidth, int workHeight):
     width(gBuffer->depth->imageInfoList[0]->imageView->image->extent.width),
     height(gBuffer->depth->imageInfoList[0]->imageView->image->extent.height),
     workWidth(workWidth),
@@ -17,8 +17,9 @@ Accumulator::Accumulator(vsg::ref_ptr<GBuffer> gBuffer, vsg::ref_ptr<Illuminatio
         throw vsg::Exception{"Accumulator::create() could not open compute shader stage"};
     }
     computeStage->specializationConstants = vsg::ShaderStage::SpecializationConstants{
-        {0, vsg::intValue::create(workWidth)}, 
-        {1, vsg::intValue::create(workHeight)}
+        {0, vsg::intValue::create(workWidth)},
+        {1, vsg::intValue::create(workHeight)},
+        {2, vsg::floatValue::create(blendAlpha)}
     };
     if(separateMatrices){
         auto compileHints = vsg::ShaderCompileSettings::create();

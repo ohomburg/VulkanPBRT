@@ -469,7 +469,10 @@ int main(int argc, char **argv)
 
         vsg::ref_ptr<Accumulator> accumulator;
         if(denoisingType != DenoisingType::None){
-            accumulator = Accumulator::create(gBuffer, illuminationBuffer, !use_external_buffers);
+            if (denoisingType == DenoisingType::ASVGF)
+                accumulator = Accumulator::create(gBuffer, illuminationBuffer, !use_external_buffers, 1.0f);
+            else
+                accumulator = Accumulator::create(gBuffer, illuminationBuffer, !use_external_buffers);
             accumulator->addDispatchToCommandGraph(commands);
             accumulationBuffer = accumulator->accumulationBuffer;
             illuminationBuffer->compile(imageLayoutCompile.context);
