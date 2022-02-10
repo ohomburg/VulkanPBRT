@@ -83,7 +83,7 @@ void main()
 			accept = accept && test_inside_screen(ipos_prev, size);
 			accept = accept && test_reprojected_normal(normal_curr, normal_prev);
 			accept = accept && abs(z_curr - z_prev) < 0.01;
-			accept = accept && mesh_id_prev == mesh_id_curr;
+			accept = accept && mesh_id_prev == mesh_id_curr && mesh_id_prev != 0;
 
 			if (accept) {
 				float w = (xx == 0 ? (1.0 - w.x) : w.x)
@@ -95,7 +95,7 @@ void main()
 			}
 		}
 	}
-	if (pos_prev.x < 0 || pos_prev.y < 0)
+	if (pos_prev.x < 0 || pos_prev.y < 0 || mesh_id_curr == 0)
 	    sum_w = 0;
 
 #ifdef ANTILAG
