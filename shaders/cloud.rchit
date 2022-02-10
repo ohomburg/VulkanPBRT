@@ -317,11 +317,14 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
     float mean = 0, var = 0;
     float trans = 1;
     float sum_w = 0;
+    float init_dist = distance(gl_ObjectToWorldEXT * vec4(x, 1), gl_WorldRayOriginEXT);
+    float delta_dist = length(gl_ObjectToWorldEXT * vec4(delta, 0));
     for (uint i = 0; i < STEPS; i++)
     {
         vec3 loc = x + i * delta;
-        float d = distance(gl_ObjectToWorldEXT * vec4(loc, 1), gl_WorldRayOriginEXT); // TODO: unoptimized poop
-        trans *= exp(textureLod(gridImage[gl_InstanceCustomIndexEXT], loc, 0).x);
+        float d = init_dist + i * delta_dist;
+        float density = textureLod(gridImage[gl_InstanceCustomIndexEXT], loc, 0).x;
+        trans *= exp(-density * parameters.extinction.x);
         mean += d * trans;
         var += d * d * trans;
         sum_w += trans;
