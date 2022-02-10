@@ -35,8 +35,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "colorspace.glsl"
 #include "viridis.glsl"
 
-#include "layout.glsl"
-
 const uint MAX_HISTLEN = 64;
 
 #ifdef ANTILAG
@@ -55,7 +53,7 @@ void main()
 	ivec2 ipos   = ivec2(gl_GlobalInvocationID.xy);
 	ivec2 size   = imageSize(tex_motion).rg;
 
-	vec2 pos_prev = imageLoad(tex_motion, ipos).rg * size;
+	vec2 pos_prev = imageLoad(tex_motion, ipos).rg * vec2(size - 1);
 
 	ivec2 p = ivec2(pos_prev - 0.5);
 	vec2  w = (pos_prev - 0.5) - floor(pos_prev - 0.5);
@@ -72,31 +70,32 @@ void main()
 	float sum_w       = 0.0;
 	float histlen     = 0.0;
 	// bilinear interpolation, check each tap individually, renormalize afterwards
-	for (int yy = 0; yy <= 1; yy++) {
-		for (int xx = 0; xx <= 1; xx++) {
-			ivec2 ipos_prev    = p + ivec2(xx, yy);
-			float z_prev       = abs(texelFetch(tex_vbuf_prev, ipos_prev, 0).x);
-			vec3  normal_prev  = uncompress_normal(texelFetch(tex_normal_prev, ipos_prev, 0).rg);
-			uint mesh_id_prev  = floatBitsToUint(texelFetch(tex_vbuf_prev, ipos_prev, 0).y);
+	if (pos_prev.x >= 0 && pos_prev.y >= 0 && mesh_id_curr != 0)
+	{
+	    for (int yy = 0; yy <= 1; yy++) {
+	    	for (int xx = 0; xx <= 1; xx++) {
+	    		ivec2 ipos_prev    = p + ivec2(xx, yy);
+	    		float z_prev       = abs(texelFetch(tex_vbuf_prev, ipos_prev, 0).x);
+	    		vec3  normal_prev  = uncompress_normal(texelFetch(tex_normal_prev, ipos_prev, 0).rg);
+	    		uint mesh_id_prev  = floatBitsToUint(texelFetch(tex_vbuf_prev, ipos_prev, 0).y);
 
-			bool accept = true;
-			accept = accept && test_inside_screen(ipos_prev, size);
-			accept = accept && test_reprojected_normal(normal_curr, normal_prev);
-			accept = accept && abs(z_curr - z_prev) < 0.01;
-			accept = accept && mesh_id_prev == mesh_id_curr && mesh_id_prev != 0;
+	    		bool accept = true;
+	    		accept = accept && test_inside_screen(ipos_prev, size);
+	    		accept = accept && test_reprojected_normal(normal_curr, normal_prev);
+	    		accept = accept && abs(z_curr - z_prev) < 0.01;
+	    		accept = accept && mesh_id_prev == mesh_id_curr && mesh_id_prev != 0;
 
-			if (accept) {
-				float w = (xx == 0 ? (1.0 - w.x) : w.x)
-					    * (yy == 0 ? (1.0 - w.y) : w.y);
-				color_prev   += imageLoad(tex_color_prev,     ipos_prev) * w;
-				moments_prev += imageLoad(tex_moments_prev,   ipos_prev).rg * w;
-				histlen      += imageLoad(tex_history_length, ipos_prev).r  * w;
-				sum_w        += w;
-			}
-		}
+	    		if (accept) {
+	    			float w = (xx == 0 ? (1.0 - w.x) : w.x)
+	    				    * (yy == 0 ? (1.0 - w.y) : w.y);
+	    			color_prev   += imageLoad(tex_color_prev,     ipos_prev) * w;
+	    			moments_prev += imageLoad(tex_moments_prev,   ipos_prev).rg * w;
+	    			histlen      += imageLoad(tex_history_length, ipos_prev).r  * w;
+	    			sum_w        += w;
+	    		}
+	    	}
+	    }
 	}
-	if (pos_prev.x < 0 || pos_prev.y < 0 || mesh_id_curr == 0)
-	    sum_w = 0;
 
 #ifdef ANTILAG
 	float antilag_alpha = 0.0;

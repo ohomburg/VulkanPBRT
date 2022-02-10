@@ -34,8 +34,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "colorspace.glsl"
 #include "svgf_shared.glsl"
 
-#include "layout.glsl"
-
 void main()
 {
 	ivec2 ipos_grad = ivec2(gl_GlobalInvocationID.xy);

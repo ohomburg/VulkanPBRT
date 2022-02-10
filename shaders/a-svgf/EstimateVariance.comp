@@ -34,8 +34,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "colorspace.glsl"
 #include "svgf_shared.glsl"
 
-#include "layout.glsl"
-
 void main()
 {
 	ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
@@ -59,18 +57,18 @@ void main()
 		return;
 	}
 
-	if (histlen < hist_len_thresh) {
+    uint mesh_id_center = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
+	if (histlen < hist_len_thresh && mesh_id_center != 0)
+	{
 		{
 			float l = luminance(c.rgb);
 			m += vec2(l, l * l);
 		}
 
 		vec3 n_center = uncompress_normal(imageLoad(tex_normal_curr, ipos).rg);
-		uint mesh_id_center = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
 
 		float sum_w = 1.0;
 		int r = histlen > 1 ? 2 : 3;
-		if (mesh_id_center == 0) r = 0; // do not filter skybox
 		for(int yy = -r; yy <= r; yy++) {
 			for(int xx = -r; xx <= r; xx++) {
 				if(xx != 0 || yy != 0) {

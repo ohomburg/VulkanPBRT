@@ -36,7 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <buffers/IlluminationBuffer.hpp>
 
 struct ASvgfPushConst {
-    vsg::vec2 jitter_offset;
     int iteration;
     int step_size;
     int gradientDownsample;

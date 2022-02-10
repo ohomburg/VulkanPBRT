@@ -196,7 +196,6 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
     // 5. Atrous
 
     auto pushConstVal = vsg::Value<ASvgfPushConst>::create(ASvgfPushConst{
-        vsg::vec2{0, 0},
         0,
         0,
         GradientDownsample,
@@ -227,7 +226,6 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
         std::swap(bindDescriptorSet1A, bindDescriptorSet1B);
 
         pushConstVal = vsg::Value<ASvgfPushConst>::create(ASvgfPushConst{
-                vsg::vec2{0, 0},
                 i,
                 1 << i,
                 GradientDownsample,
@@ -293,7 +291,6 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
         std::swap(bindDescriptorSet1A, bindDescriptorSet1B);
 
         pushConstVal = vsg::Value<ASvgfPushConst>::create(ASvgfPushConst{
-                vsg::vec2{0, 0},
                 i,
                 1 << i,
                 GradientDownsample,

@@ -30,6 +30,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define NO_BINDINGS
 #include "svgf_shared.glsl"
 
 layout(constant_id=0) const int gradientDownsample = 3;
