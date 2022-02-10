@@ -314,24 +314,27 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
     rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax);
     x += tMin * w;
     vec3 delta = w * (tMax - tMin);
-    float mean = 0, var = 0;
+    float mean = 0, var = 0, sum_w = 0, sum_w2 = 0;
     float trans = 1;
-    float sum_w = 0;
     float init_dist = distance(gl_ObjectToWorldEXT * vec4(x, 1), gl_WorldRayOriginEXT);
     float delta_dist = length(gl_ObjectToWorldEXT * vec4(delta, 0));
+    // Iterative weighted mean and variance, after West 1979, https://doi.org/10.1145/359146.359153
     for (uint i = 0; i < STEPS; i++)
     {
         vec3 loc = x + i * delta;
         float d = init_dist + i * delta_dist;
         float density = textureLod(gridImage[gl_InstanceCustomIndexEXT], loc, 0).x;
         trans *= exp(-density * parameters.extinction.x);
-        mean += d * trans;
-        var += d * d * trans;
-        sum_w += trans;
+
+        float w = trans;
+        sum_w += w;
+        sum_w2 += w * w;
+        float old_mean = mean;
+        mean += (w / sum_w) * (d - old_mean);
+        var += w * (d - old_mean) * (d - mean);
     }
-    mean /= sum_w;
-    var -= mean;
-    var /= sum_w;
+    // use reliability variance
+    var /= sum_w - sum_w2 / sum_w;
     return vec2(mean, var);
 }
 
