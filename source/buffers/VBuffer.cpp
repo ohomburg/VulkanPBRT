@@ -32,10 +32,12 @@ VBuffer::VBuffer(uint32_t width, uint32_t height)
     // HACK: hardcoded vertex input settings from vsgXchange assimp loader
     vertexInputState->vertexBindingDescriptions.emplace_back(VkVertexInputBindingDescription{0, 12, VK_VERTEX_INPUT_RATE_VERTEX});
     vertexInputState->vertexAttributeDescriptions.emplace_back(VkVertexInputAttributeDescription{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0});
+    auto rasterState = vsg::RasterizationState::create();
+    rasterState->cullMode = VK_CULL_MODE_NONE;
     vsg::GraphicsPipelineStates pipelineStates {
         vertexInputState,
         vsg::InputAssemblyState::create(), // default settings
-        vsg::RasterizationState::create(), // default settings
+        rasterState,
         vsg::MultisampleState::create(), // default settings
         vsg::DepthStencilState::create(), // default settings
         vsg::ColorBlendState::create(vsg::ColorBlendState::ColorBlendAttachments{{
