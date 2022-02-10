@@ -10,8 +10,8 @@
 #include "renderModules/denoisers/BFR.hpp"
 #include "renderModules/denoisers/BFRBlender.hpp"
 #include "renderModules/denoisers/BMFR.hpp"
-#include "Denoiser/A_SVGF.hpp"
-#include "VBuffer.hpp"
+#include "renderModules/denoisers/A_SVGF.hpp"
+#include "buffers/VBuffer.hpp"
 #include "renderModules/Taa.hpp"
 #include "io/RenderIO.hpp"
 
@@ -368,7 +368,7 @@ int main(int argc, char **argv)
             gBuffer = GBuffer::create(windowTraits->width, windowTraits->height);
             accumulationBuffer = AccumulationBuffer::create(windowTraits->width, windowTraits->height);
             writeGBuffer = true;
-            illuminationBuffer = IlluminationBufferFinalDemodulated::create(windowTraits->width, windowTraits->height);
+            illuminationBuffer = IlluminationBufferDemodulatedFloat::create(windowTraits->width, windowTraits->height);
         }
         else if (denoisingType != DenoisingType::None)
         {

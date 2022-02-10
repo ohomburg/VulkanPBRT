@@ -15,14 +15,23 @@ void GBuffer::updateDescriptor(vsg::BindDescriptorSet* descSet, const vsg::Bindi
     auto materialBind = vsg::DescriptorImage::create(material->imageInfoList, materialInd, 0, material->descriptorType);
     int albedoInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "albedoImage").second;
     auto albedoBind = vsg::DescriptorImage::create(albedo->imageInfoList, albedoInd, 0, albedo->descriptorType);
-    int volumeInd = vsg::ShaderStage::getSetBindingIndex(bindingMap, "volumeImage").second;
+    int volumeInd = -1;
+    for (auto& entry: bindingMap){
+        for (int i = 0; i < static_cast<int>(entry.second.names.size()); ++i){
+            if (entry.second.names[i] == "volumeImage") {
+                volumeInd = entry.second.bindings[i].binding;
+            }
+        }
+    }
+
     auto volumeBind = vsg::DescriptorImage::create(volume->imageInfoList, volumeInd, 0, volume->descriptorType);
 
     descSet->descriptorSet->descriptors.push_back(depthBind);
     descSet->descriptorSet->descriptors.push_back(normalBind);
     descSet->descriptorSet->descriptors.push_back(materialBind);
     descSet->descriptorSet->descriptors.push_back(albedoBind);
-    descSet->descriptorSet->descriptors.push_back(volumeBind);
+    if (volumeInd >= 0)
+        descSet->descriptorSet->descriptors.push_back(volumeBind);
 }
 void GBuffer::updateImageLayouts(vsg::Context& context)
 {

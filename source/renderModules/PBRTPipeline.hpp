@@ -4,7 +4,7 @@
 #include <buffers/IlluminationBuffer.hpp>
 #include <scene/RayTracingVisitor.hpp>
 #include <buffers/AccumulationBuffer.hpp>
-#include "Denoiser/A_SVGF.hpp"
+#include <renderModules/denoisers/A_SVGF.hpp>
 
 #include <vsg/all.h>
 #include <vsgXchange/glsl.h>

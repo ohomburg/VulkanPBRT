@@ -30,10 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <vsg/all.h>
-#include "../AccumulationBuffer.hpp"
-#include "../GBuffer.hpp"
-#include "../VBuffer.hpp"
-#include "../IlluminationBuffer.hpp"
+#include <buffers/AccumulationBuffer.hpp>
+#include <buffers/GBuffer.hpp>
+#include <buffers/VBuffer.hpp>
+#include <buffers/IlluminationBuffer.hpp>
 
 struct ASvgfPushConst {
     vsg::vec2 jitter_offset;
