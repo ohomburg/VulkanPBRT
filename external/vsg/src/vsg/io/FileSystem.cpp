@@ -25,6 +25,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #    include <unistd.h>
 #endif
 
+#include <algorithm>
 #include <iostream>
 
 using namespace vsg;
@@ -111,16 +112,26 @@ Path vsg::filePath(const Path& path)
     }
     else
     {
-        return Path();
+        return {};
     }
 }
 
 Path vsg::fileExtension(const Path& path)
 {
+    // available in cpp20
+    auto endsWith = [](std::string_view str, std::string_view suffix) {
+        return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
+    };
+
+    // handle dot and dotdot in the path - since end-users can mix delimiter types we have to handle both cases
+    if (endsWith(path, "\\.") || endsWith(path, "/.")) return {};
+    if (endsWith(path, "\\..") || endsWith(path, "/..")) return {};
+
     std::string::size_type dot = path.find_last_of('.');
     std::string::size_type slash = path.find_last_of(PATH_SEPARATORS);
-    if (dot == std::string::npos || (slash != std::string::npos && dot < slash)) return Path();
-    return path.substr(dot + 1);
+    if (dot == std::string::npos || (slash != std::string::npos && dot < slash)) return {};
+    if (dot != std::string::npos && path.length() == 1) return {};
+    return path.substr(dot);
 }
 
 Path vsg::lowerCaseFileExtension(const Path& path)
@@ -162,11 +173,19 @@ Path vsg::removeExtension(const Path& path)
         return {};
 }
 
-Path vsg::concatPaths(const Path& left, const Path& right)
+Path vsg::concatPaths(Path left, Path right)
 {
     if (left.empty())
     {
         return (right);
+    }
+    if (!left.empty())
+    {
+        std::replace(left.begin(), left.end(), delimiterForeign, delimiterNative);
+    }
+    if (!right.empty())
+    {
+        std::replace(right.begin(), right.end(), delimiterForeign, delimiterNative);
     }
     char lastChar = left[left.size() - 1];
 
@@ -199,27 +218,28 @@ Path vsg::findFile(const Path& filename, const Paths& paths)
 
 Path vsg::findFile(const Path& filename, const Options* options)
 {
-    if (options && !options->paths.empty())
+    if (options)
     {
         // if Options has a findFileCallback use it
         if (options->findFileCallback) return options->findFileCallback(filename, options);
 
-        // if appropriate use the filename directly if it exists.
-        if (options->checkFilenameHint == Options::CHECK_ORIGINAL_FILENAME_EXISTS_FIRST && fileExists(filename)) return filename;
+        if (!options->paths.empty())
+        {
+            // if appropriate use the filename directly if it exists.
+            if (options->checkFilenameHint == Options::CHECK_ORIGINAL_FILENAME_EXISTS_FIRST && fileExists(filename)) return filename;
 
-        // search for the file if the in the specific paths.
-        if (auto path = findFile(filename, options->paths); !path.empty()) return path;
+            // search for the file if the in the specific paths.
+            if (auto path = findFile(filename, options->paths); !path.empty()) return path;
 
-        // if appropriate use the filename directly if it exists.
-        if (options->checkFilenameHint == Options::CHECK_ORIGINAL_FILENAME_EXISTS_LAST && fileExists(filename))
-            return filename;
-        else
-            return {};
+            // if appropriate use the filename directly if it exists.
+            if (options->checkFilenameHint == Options::CHECK_ORIGINAL_FILENAME_EXISTS_LAST && fileExists(filename))
+                return filename;
+            else
+                return {};
+        }
     }
-    else
-    {
-        return fileExists(filename) ? filename : Path();
-    }
+
+    return fileExists(filename) ? filename : Path();
 }
 
 bool vsg::makeDirectory(const Path& path)

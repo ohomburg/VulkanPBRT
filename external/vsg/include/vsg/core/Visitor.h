@@ -40,13 +40,13 @@ namespace vsg
     class DepthSorted;
     class Bin;
     class Switch;
-    class MaskGroup;
     class Volumetric;
 
     // forward declare vulkan classes
     class BufferInfo;
     class Command;
     class StateCommand;
+    class StateSwitch;
     class CommandBuffer;
     class RenderPass;
     class BindDescriptorSet;
@@ -245,13 +245,13 @@ namespace vsg
         virtual void apply(DepthSorted&);
         virtual void apply(Bin&);
         virtual void apply(Switch&);
-        virtual void apply(MaskGroup&);
         virtual void apply(Volumetric&);
 
         // Vulkan nodes
         virtual void apply(BufferInfo&);
         virtual void apply(Command&);
         virtual void apply(StateCommand&);
+        virtual void apply(StateSwitch&);
         virtual void apply(CommandBuffer&);
         virtual void apply(RenderPass&);
         virtual void apply(BindDescriptorSet&);

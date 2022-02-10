@@ -25,7 +25,7 @@ set(SOURCES
 
     introspection/c_interface.cpp
 
-    maths/transform.cpp
+    maths/maths_transform.cpp
 
     nodes/Group.cpp
     nodes/Geometry.cpp
@@ -41,7 +41,6 @@ set(SOURCES
     nodes/DepthSorted.cpp
     nodes/Bin.cpp
     nodes/Switch.cpp
-    nodes/MaskGroup.cpp
     nodes/StateGroup.cpp
     nodes/Volumetric.cpp
 
@@ -67,6 +66,8 @@ set(SOURCES
     commands/SetLineWidth.cpp
     commands/SetScissor.cpp
     commands/SetViewport.cpp
+    commands/ResetQueryPool.cpp
+    commands/WriteTimestamp.cpp
 
     state/Buffer.cpp
     state/BufferInfo.cpp
@@ -85,6 +86,7 @@ set(SOURCES
     state/Sampler.cpp
     state/ResourceHints.cpp
     state/StateCommand.cpp
+    state/StateSwitch.cpp
     state/Image.cpp
     state/ImageInfo.cpp
     state/ImageView.cpp
@@ -97,6 +99,7 @@ set(SOURCES
     state/DepthStencilState.cpp
     state/ColorBlendState.cpp
     state/DynamicState.cpp
+    state/QueryPool.cpp
 
     io/FileSystem.cpp
     io/AsciiInput.cpp

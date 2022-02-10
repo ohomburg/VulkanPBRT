@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.7)
 
 project(vsg
-    VERSION 0.2.0
+    VERSION 0.2.3
     DESCRIPTION "VulkanSceneGraph library"
     LANGUAGES CXX
 )
-set(VSG_SOVERSION 4)
+set(VSG_SOVERSION 5)
 SET(VSG_RELEASE_CANDIDATE 0)
 set(Vulkan_MIN_VERSION 1.2.162)
 
@@ -19,6 +19,8 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(vsgMacros)
+
+find_package(nlohmann_json REQUIRED)
 
 vsg_setup_dir_vars()
 vsg_setup_build_vars()

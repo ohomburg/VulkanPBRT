@@ -13,22 +13,8 @@ layout(binding = 18, rgba8) uniform image2D albedoImage;
 layout(binding = 31, rgba32f) uniform image2D volumeImage;
 #endif
 
-#ifdef PREV_GBUFFER
-layout(binding = 19) uniform sampler2D prevDepth;
-layout(binding = 20) uniform sampler2D prevNormal;
-layout(binding = 21, r16f) uniform image2D motion;
-layout(binding = 22, r8) uniform image2D sampleCounts;
-layout(binding = 24) uniform sampler2D prevSampleCounts;
-#endif
-
-#ifdef DEMOD_ILLUMINATION
-layout(binding = 23) uniform sampler2D prevOutput;
-layout(binding = 25, rgba16f) uniform image2D illumination;
-#endif
-
-#ifdef DEMOD_ILLUMINATION_SQUARED
-layout(binding = 27, rgba16f) uniform image2D illuminationSquared;
-layout(binding = 28) uniform sampler2D prevIlluminationSquared;
+#ifdef DEMOD_ILLUMINATION_FLOAT
+layout(binding = 25, rgba32f) uniform image2D illumination;
 #endif
 
 #ifdef TEMP_GRADIENT
