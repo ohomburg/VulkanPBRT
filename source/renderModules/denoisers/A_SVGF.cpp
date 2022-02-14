@@ -85,6 +85,8 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         {12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
         {13, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {15, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {16, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
 
     vsg::DescriptorSetLayoutBindings layoutBindings1 = {
@@ -97,12 +99,13 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {8, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
 
     auto setLayout0 = vsg::DescriptorSetLayout::create(layoutBindings0), setLayout1 = vsg::DescriptorSetLayout::create(layoutBindings1);
 
     auto pipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{setLayout0, setLayout1},
-         vsg::PushConstantRanges{{VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ASvgfPushConst)}});
+         vsg::PushConstantRanges{{VK_SHADER_STAGE_COMPUTE_BIT, 0, 64 + sizeof(ASvgfPushConst)}});
 
     pipelines = shaderStages.map<vsg::ref_ptr<vsg::ComputePipeline>>([&](const auto& shader) {
         return vsg::ComputePipeline::create(pipelineLayout, shader);
@@ -123,6 +126,8 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
     accum_moments_prev = createImage(width, height, VK_FORMAT_R32G32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     accum_histlen = createImage(width, height, VK_FORMAT_R16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     accum_histlen_prev = createImage(width, height, VK_FORMAT_R16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    accum_volume = createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    accum_volume_prev = createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     varA = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     varB = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     color_hist = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
@@ -143,6 +148,8 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         vsg::DescriptorImage::create(accBuffer->prevNormal->imageInfoList, 12, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
         vsg::DescriptorImage::create(gradProjector->mergedVisBuffer->imageInfoList, 13, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(gradProjector->prevVisBuffer->imageInfoList, 14, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
+        vsg::DescriptorImage::create(gBuffer->volume->imageInfoList, 15, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(accum_volume_prev, 16, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
     };
 
     vsg::Descriptors desc1A {
@@ -153,8 +160,9 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         vsg::DescriptorImage::create(accum_color, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_moments, 5, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_histlen, 6, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(varA, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(varB, 8, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+        vsg::DescriptorImage::create(accum_volume, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(varA, 8, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(varB, 9, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     };
     vsg::Descriptors desc1B { // the same, but all the A/Bs switched around.
         vsg::DescriptorImage::create(diffB1, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
@@ -164,8 +172,9 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         vsg::DescriptorImage::create(accum_color, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_moments, 5, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_histlen, 6, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(varB, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(varA, 8, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+        vsg::DescriptorImage::create(accum_volume, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(varB, 8, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(varA, 9, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     };
 
     auto ds0 = vsg::DescriptorSet::create(setLayout0, desc0);
@@ -174,6 +183,8 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
     bindDescriptorSet0 = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, ds0);
     bindDescriptorSet1A = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 1, ds1A);
     bindDescriptorSet1B = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 1, ds1B);
+
+    projConstantValue = vsg::mat4Value::create();
 }
 
 void A_SVGF::compile(vsg::Context &ctx)
@@ -211,7 +222,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
     commandGraph->addChild(bindPipelines.createGradSamples);
     commandGraph->addChild(bindDescriptorSet0);
     commandGraph->addChild(bindDescriptorSet1A);
-    commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstVal));
+    commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, projConstantValue));
+    commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 64, pushConstVal));
     commandGraph->addChild(vsg::Dispatch::create(gradTileWidth, gradTileHeight, 1));
 
     auto pipelineBarrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
@@ -232,7 +244,7 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
                 TemporalAlpha,
                 ModulateAlbedo,
         });
-        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstVal));
+        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 64, pushConstVal));
         commandGraph->addChild(vsg::Dispatch::create(gradTileWidth, gradTileHeight, 1));
         commandGraph->addChild(pipelineBarrier);
     }
@@ -297,7 +309,7 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
                 TemporalAlpha,
                 ModulateAlbedo && i == NumIterations - 1,
         });
-        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstVal));
+        commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 64, pushConstVal));
         commandGraph->addChild(vsg::Dispatch::create(tileWidth, tileHeight, 1));
         commandGraph->addChild(pipelineBarrier);
     }
@@ -346,6 +358,19 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
             {width, height, 1}
     }};
     commandGraph->addChild(copyCmd);
+    copyCmd = vsg::CopyImage::create();
+    copyCmd->srcImage = accum_volume->imageView->image;
+    copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copyCmd->dstImage = accum_volume_prev->imageView->image;
+    copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    copyCmd->regions = {VkImageCopy{
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+            {0, 0, 0},
+            {width, height, 1}
+    }};
+    commandGraph->addChild(copyCmd);
 }
 
 vsg::ref_ptr<vsg::DescriptorImage> A_SVGF::getFinalDescriptorImage() const
@@ -359,12 +384,22 @@ void A_SVGF::updateImageLayouts(vsg::Context &context)
     auto barr = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
 
     VkImageSubresourceRange rr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_moments_prev, accum_histlen_prev, varA, varB, color_hist})
+    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_volume, accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist})
     {
         barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0, img->imageView->image, rr));
     }
 
     context.commands.emplace_back(barr);
+}
+
+void A_SVGF::updatePushConstants(vsg::dmat4 projMatrix, vsg::dmat4 viewMatrix, double near, double far) {
+    vsg::dmat4 normalizeMat(2.0 / (double)width, 0, 0, 0,
+                           0, 2.0 / (double)height, 0,  0,
+                           0, 0, far / (near - far), -1,
+                           -1, -1, (far * near) / (near - far), 0);
+    projConstantValue->value() = inverse(normalizeMat) * prevProjMatrix * prevViewMatrix * inverse(viewMatrix) * inverse(projMatrix) * normalizeMat;
+    prevProjMatrix = projMatrix;
+    prevViewMatrix = viewMatrix;
 }
 
 // clear command

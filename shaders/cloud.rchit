@@ -306,6 +306,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine 
     return ( sampleSkybox(w) + sampleLight(w) );
 }
 
+#extension GL_EXT_debug_printf : enable
 vec2 GetPrimaryStats(vec3 x, vec3 w)
 {
     // Ray march to get transmittance-weighted depth
@@ -324,14 +325,18 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
         vec3 loc = x + i * delta;
         float d = init_dist + i * delta_dist;
         float density = textureLod(gridImage[gl_InstanceCustomIndexEXT], loc, 0).x;
-        trans *= exp(-density * parameters.extinction.x);
 
-        float w = trans;
+        // Weight = Amount of energy flow to camera = Transmittance times Scattering = transmittance * const * density.
+        // Constant factor is normalized away through the weight sum, so ignore it.
+        float w = trans * density;
+        if (w == 0.0) continue; // no change to stats or transmittance
         sum_w += w;
         sum_w2 += w * w;
         float old_mean = mean;
         mean += (w / sum_w) * (d - old_mean);
         var += w * (d - old_mean) * (d - mean);
+
+        trans *= exp(-density * parameters.extinction.x);
     }
     // use reliability variance
     var /= sum_w - sum_w2 / sum_w;

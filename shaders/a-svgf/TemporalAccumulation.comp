@@ -64,37 +64,64 @@ void main()
 	float l            = luminance(color_curr);
 	vec2  moments_curr = vec2(l, l * l);
 	uint  mesh_id_curr = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
+	vec2  cloud_curr = vec2(0);
 
 	vec4 color_prev   = vec4(0);
 	vec2 moments_prev = vec2(0);
 	float sum_w       = 0.0;
 	float histlen     = 0.0;
+	vec2 cloud_prev = vec2(0);
 	// bilinear interpolation, check each tap individually, renormalize afterwards
-	if (pos_prev.x >= 0 && pos_prev.y >= 0 && mesh_id_curr != 0)
+    if (mesh_id_curr >= 0x80000000)
+    {
+        cloud_curr = imageLoad(tex_volume_curr, ipos).rg;
+
+        // check that cloud features are regular numbers
+        if (!any(isinf(cloud_curr)) && !any(isnan(cloud_curr)))
+        {
+            for (int i = -2; i <= 2; i++)
+            {
+                vec3 pos = vec3(vec2(gl_GlobalInvocationID.xy), cloud_curr.x + i * (cloud_curr.y * 0.5));
+                vec4 prev_pos = mat_reproj * vec4(pos, 1);
+                prev_pos.xy /= prev_pos.w;
+
+                ivec2 ipos_prev = ivec2(prev_pos.xy);
+                vec2 features_prev = imageLoad(tex_volume_prev, ipos_prev).rg;
+
+                float w = saturate(1 - abs(prev_pos.z - features_prev.x) / features_prev.y);
+                color_prev += imageLoad(tex_color_prev, ipos_prev) * w;
+                moments_prev += imageLoad(tex_moments_prev, ipos_prev).rg * w;
+                histlen += imageLoad(tex_history_length, ipos_prev).r * w;
+                cloud_prev += features_prev * w;
+                sum_w += w;
+            }
+        }
+    }
+	else if (pos_prev.x >= 0 && pos_prev.y >= 0 && mesh_id_curr != 0)
 	{
-	    for (int yy = 0; yy <= 1; yy++) {
-	    	for (int xx = 0; xx <= 1; xx++) {
-	    		ivec2 ipos_prev    = p + ivec2(xx, yy);
-	    		float z_prev       = abs(texelFetch(tex_vbuf_prev, ipos_prev, 0).x);
-	    		vec3  normal_prev  = uncompress_normal(texelFetch(tex_normal_prev, ipos_prev, 0).rg);
-	    		uint mesh_id_prev  = floatBitsToUint(texelFetch(tex_vbuf_prev, ipos_prev, 0).y);
+        for (int yy = 0; yy <= 1; yy++) {
+            for (int xx = 0; xx <= 1; xx++) {
+                ivec2 ipos_prev    = p + ivec2(xx, yy);
+                float z_prev       = abs(texelFetch(tex_vbuf_prev, ipos_prev, 0).x);
+                vec3  normal_prev  = uncompress_normal(texelFetch(tex_normal_prev, ipos_prev, 0).rg);
+                uint mesh_id_prev  = floatBitsToUint(texelFetch(tex_vbuf_prev, ipos_prev, 0).y);
 
-	    		bool accept = true;
-	    		accept = accept && test_inside_screen(ipos_prev, size);
-	    		accept = accept && test_reprojected_normal(normal_curr, normal_prev);
-	    		accept = accept && abs(z_curr - z_prev) < 0.01;
-	    		accept = accept && mesh_id_prev == mesh_id_curr && mesh_id_prev != 0;
+                bool accept = true;
+                accept = accept && test_inside_screen(ipos_prev, size);
+                accept = accept && test_reprojected_normal(normal_curr, normal_prev);
+                accept = accept && abs(z_curr - z_prev) < 0.01;
+                accept = accept && mesh_id_prev == mesh_id_curr && mesh_id_prev != 0;
 
-	    		if (accept) {
-	    			float w = (xx == 0 ? (1.0 - w.x) : w.x)
-	    				    * (yy == 0 ? (1.0 - w.y) : w.y);
-	    			color_prev   += imageLoad(tex_color_prev,     ipos_prev) * w;
-	    			moments_prev += imageLoad(tex_moments_prev,   ipos_prev).rg * w;
-	    			histlen      += imageLoad(tex_history_length, ipos_prev).r  * w;
-	    			sum_w        += w;
-	    		}
-	    	}
-	    }
+                if (accept) {
+                    float w = (xx == 0 ? (1.0 - w.x) : w.x)
+                            * (yy == 0 ? (1.0 - w.y) : w.y);
+                    color_prev   += imageLoad(tex_color_prev,     ipos_prev) * w;
+                    moments_prev += imageLoad(tex_moments_prev,   ipos_prev).rg * w;
+                    histlen      += imageLoad(tex_history_length, ipos_prev).r  * w;
+                    sum_w        += w;
+                }
+            }
+        }
 	}
 
 #ifdef ANTILAG
@@ -132,6 +159,7 @@ void main()
 		color_prev   /= sum_w;
 		moments_prev /= sum_w;
 		histlen      /= sum_w;
+		cloud_prev   /= sum_w;
 
 #ifndef ANTILAG
 		const float alpha_color   = max(temporal_alpha, 1.0 / (histlen + 1.0));
@@ -154,6 +182,7 @@ void main()
 		#else
 		imageStore(img_histlen, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0)));
 		#endif
+		imageStore(img_acc_volume, ipos, vec4(mix(cloud_prev, cloud_curr, alpha_color), 0, 0));
 	}
 	else
 	{
@@ -165,6 +194,7 @@ void main()
 		imageStore(img_antilag_alpha, ipos, vec4(viridis_quintic(1), 0.0));
   #endif
 #endif
+        imageStore(img_acc_volume, ipos, vec4(cloud_curr, 0, 0));
 	}
 
 }

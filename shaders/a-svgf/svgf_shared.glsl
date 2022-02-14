@@ -96,6 +96,8 @@ layout(set=0, binding=11, rgba32f) uniform   image2D tex_normal_curr;
 layout(set=0, binding=12)          uniform sampler2D tex_normal_prev;
 layout(set=0, binding=13, rgba32f) uniform   image2D tex_vbuf_curr;
 layout(set=0, binding=14)          uniform sampler2D tex_vbuf_prev;
+layout(set=0, binding=15, rgba32f) uniform   image2D tex_volume_curr;
+layout(set=0, binding=16, rgba32f) uniform   image2D tex_volume_prev;
 
 // outputs from CreateGradientSamples
 layout(set=1, binding=0, rgba32f) uniform image2D img_diffA1;
@@ -109,17 +111,19 @@ layout(set=1, binding=3, rgba32f) uniform image2D img_diffB2;
 layout(set=1, binding=4, rgba16f) uniform image2D img_accumulated;
 layout(set=1, binding=5, rg32f) uniform image2D img_moments;
 layout(set=1, binding=6, r16f) uniform image2D img_histlen;
+layout(set=1, binding=7, rgba32f) uniform image2D img_acc_volume;
 
 // output from EstimateVariance
-layout(set=1, binding=7, rgba16f) uniform image2D img_varianceA;
+layout(set=1, binding=8, rgba16f) uniform image2D img_varianceA;
 
 // output from Atrous
-layout(set=1, binding=8, rgba16f) uniform image2D img_varianceB;
+layout(set=1, binding=9, rgba16f) uniform image2D img_varianceB;
 
 // for Atrous
 layout(constant_id=0) const int FILTER_KERNEL = 0;
 
 layout(push_constant) uniform PerImageCB {
+    mat4 mat_reproj; // VP-matrix times inverse of previous VP-matrix
 	int iteration;
 	int step_size;
 	int gradientDownsample;

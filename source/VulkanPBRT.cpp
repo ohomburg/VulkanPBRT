@@ -480,6 +480,7 @@ int main(int argc, char **argv)
             illuminationBuffer = accumulator->accumulatedIllumination; //swap illumination buffer to accumulated illumination for correct use in the following pipelines
         }
 
+        vsg::ref_ptr<A_SVGF> a_svgf;
         vsg::ref_ptr<vsg::DescriptorImage> finalDescriptorImage;
         switch (denoisingType)
         {
@@ -595,7 +596,7 @@ int main(int argc, char **argv)
             }
             break;
         case DenoisingType::ASVGF: {
-            auto a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer, gradientProjector);
+            a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer, gradientProjector);
             a_svgf->compile(imageLayoutCompile.context);
             a_svgf->updateImageLayouts(imageLayoutCompile.context);
             a_svgf->addDispatchToCommandGraph(commands);
@@ -713,6 +714,8 @@ int main(int argc, char **argv)
             rayTracingPushConstantsValue->value().viewInverse = lookAt->inverse();
             if (gradientProjector)
                 gradientProjector->updatePushConstants(perspective->transform(), lookAt->transform(), frame_index);
+            if (a_svgf)
+                a_svgf->updatePushConstants(perspective->transform(), lookAt->transform(), perspective->nearDistance, perspective->farDistance);
 
             rayTracingPushConstantsValue->value().frameNumber= frame_index;
             rayTracingPushConstantsValue->value().sampleNumber = sample_index;
