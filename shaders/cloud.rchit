@@ -309,7 +309,7 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine 
 vec2 GetPrimaryStats(vec3 x, vec3 w)
 {
     // Ray march to get transmittance-weighted depth
-    const uint STEPS = 16;
+    const uint STEPS = 64;
     float tMin, tMax;
     rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax);
     // tMin is always zero (intersection shader reports accurate hit location)
@@ -329,14 +329,14 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
         // Weight = Amount of energy flow to camera = Transmittance times Scattering = transmittance * const * density.
         // Constant factor is normalized away through the weight sum, so ignore it.
         float w = trans * density;
-        if (w == 0.0) continue; // no change to stats or transmittance
+        trans *= exp(-density * parameters.extinction.x);
+
         sum_w += w;
         sum_w2 += w * w;
         float old_mean = mean;
-        mean += (w / sum_w) * (d - old_mean);
+        // clamp to get rid of NaN, HACK: this relies on unspecified behavior
+        mean += clamp(w / sum_w, 0, 1) * (d - old_mean);
         var += w * (d - old_mean) * (d - mean);
-
-        trans *= exp(-density * parameters.extinction.x);
     }
     // use reliability variance
     var /= sum_w - sum_w2 / sum_w;
