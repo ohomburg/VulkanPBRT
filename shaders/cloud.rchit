@@ -306,15 +306,15 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine 
     return ( sampleSkybox(w) + sampleLight(w) );
 }
 
-#extension GL_EXT_debug_printf : enable
 vec2 GetPrimaryStats(vec3 x, vec3 w)
 {
     // Ray march to get transmittance-weighted depth
     const uint STEPS = 16;
     float tMin, tMax;
     rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax);
-    x += tMin * w;
-    vec3 delta = w * (tMax - tMin);
+    // tMin is always zero (intersection shader reports accurate hit location)
+    vec3 delta = w * tMax / STEPS;
+    x += 0.5 * delta;
     float mean = 0, var = 0, sum_w = 0, sum_w2 = 0;
     float trans = 1;
     float init_dist = distance(gl_ObjectToWorldEXT * vec4(x, 1), gl_WorldRayOriginEXT);
