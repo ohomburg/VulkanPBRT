@@ -119,8 +119,12 @@ layout(set=1, binding=8, rgba16f) uniform image2D img_varianceA;
 // output from Atrous
 layout(set=1, binding=9, rgba16f) uniform image2D img_varianceB;
 
+layout(set=0, binding=99, rgba32f) uniform image2D img_debug;
+
 // for Atrous
 layout(constant_id=0) const int FILTER_KERNEL = 0;
+// for TemporalAccumulation
+layout(constant_id=1) const int CLOUD_SAMPLE_COUNT = 5;
 
 layout(push_constant) uniform PerImageCB {
     mat4 mat_reproj; // VP-matrix times inverse of previous VP-matrix

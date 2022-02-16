@@ -715,7 +715,7 @@ int main(int argc, char **argv)
             if (gradientProjector)
                 gradientProjector->updatePushConstants(perspective->transform(), lookAt->transform(), frame_index);
             if (a_svgf)
-                a_svgf->updatePushConstants(perspective->transform(), lookAt->transform(), perspective->nearDistance, perspective->farDistance);
+                a_svgf->updatePushConstants(perspective->transform(), lookAt->transform());
 
             rayTracingPushConstantsValue->value().frameNumber= frame_index;
             rayTracingPushConstantsValue->value().sampleNumber = sample_index;

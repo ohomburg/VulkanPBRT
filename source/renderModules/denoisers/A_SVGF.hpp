@@ -82,7 +82,7 @@ public:
     void addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph);
     vsg::ref_ptr<vsg::DescriptorImage> getFinalDescriptorImage() const;
     void updateImageLayouts(vsg::Context& context);
-    void updatePushConstants(vsg::dmat4 projMatrix, vsg::dmat4 viewMatrix, double near, double far);
+    void updatePushConstants(vsg::dmat4 projMatrix, vsg::dmat4 viewMatrix);
 
     int   GradientDownsample = 3;
     bool  ModulateAlbedo = true;
@@ -120,7 +120,7 @@ private:
 
     // Resources
     vsg::ref_ptr<vsg::ImageInfo> diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_volume,
-        accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist;
+        accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist, debug_img;
 
     vsg::ref_ptr<vsg::mat4Value> projConstantValue;
     vsg::dmat4 prevProjMatrix, prevViewMatrix;

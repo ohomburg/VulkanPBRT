@@ -87,6 +87,7 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         {14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
         {15, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {16, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
+        {99, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
 
     vsg::DescriptorSetLayoutBindings layoutBindings1 = {
@@ -131,6 +132,7 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
     varA = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     varB = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     color_hist = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    debug_img = createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT);
 
     vsg::Descriptors desc0 {
         vsg::DescriptorImage::create(/*irradiance*/illuBuffer->illuminationImages[0]->imageInfoList, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
@@ -150,6 +152,7 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         vsg::DescriptorImage::create(gradProjector->prevVisBuffer->imageInfoList, 14, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER),
         vsg::DescriptorImage::create(gBuffer->volume->imageInfoList, 15, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_volume_prev, 16, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
+        vsg::DescriptorImage::create(debug_img, 99, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
     };
 
     vsg::Descriptors desc1A {
@@ -384,7 +387,7 @@ void A_SVGF::updateImageLayouts(vsg::Context &context)
     auto barr = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
 
     VkImageSubresourceRange rr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_volume, accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist})
+    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_volume, accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist, debug_img})
     {
         barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0, img->imageView->image, rr));
     }
@@ -392,12 +395,13 @@ void A_SVGF::updateImageLayouts(vsg::Context &context)
     context.commands.emplace_back(barr);
 }
 
-void A_SVGF::updatePushConstants(vsg::dmat4 projMatrix, vsg::dmat4 viewMatrix, double near, double far) {
-    vsg::dmat4 normalizeMat(2.0 / (double)width, 0, 0, 0,
-                           0, 2.0 / (double)height, 0,  0,
-                           0, 0, far / (near - far), -1,
-                           -1, -1, (far * near) / (near - far), 0);
-    projConstantValue->value() = inverse(normalizeMat) * prevProjMatrix * prevViewMatrix * inverse(viewMatrix) * inverse(projMatrix) * normalizeMat;
+void A_SVGF::updatePushConstants(vsg::dmat4 projMatrix, vsg::dmat4 viewMatrix) {
+    // no projection on the z values!
+    projMatrix(2, 2) = 1;
+    projMatrix(2, 3) = 0;
+    projMatrix(3, 2) = 0;
+    projMatrix(3, 3) = 1;
+    projConstantValue->value() = prevProjMatrix * prevViewMatrix * inverse(viewMatrix) * inverse(projMatrix);
     prevProjMatrix = projMatrix;
     prevViewMatrix = viewMatrix;
 }

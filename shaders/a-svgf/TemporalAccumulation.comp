@@ -71,7 +71,8 @@ void main()
 	float sum_w       = 0.0;
 	float histlen     = 0.0;
 	vec2 cloud_prev = vec2(0);
-	// bilinear interpolation, check each tap individually, renormalize afterwards
+
+	imageStore(img_debug, ipos, vec4(0));
     if (mesh_id_curr >= 0x80000000)
     {
         cloud_curr = imageLoad(tex_volume_curr, ipos).rg;
@@ -79,16 +80,21 @@ void main()
         // check that cloud features are regular numbers
         if (!any(isinf(cloud_curr)) && !any(isnan(cloud_curr)))
         {
-            for (int i = -2; i <= 2; i++)
+            for (int i = -(CLOUD_SAMPLE_COUNT - 1)/2; i <= (CLOUD_SAMPLE_COUNT - 1)/2; i++)
             {
-                vec3 pos = vec3(vec2(gl_GlobalInvocationID.xy), cloud_curr.x + i * (cloud_curr.y * 0.5));
-                vec4 prev_pos = mat_reproj * vec4(pos, 1);
-                prev_pos.xy /= prev_pos.w;
+                float ii = i / max(float(CLOUD_SAMPLE_COUNT / 2), 1);
+                vec3 pos = vec3(vec2(gl_GlobalInvocationID.xy), -cloud_curr.x + ii * (cloud_curr.y * 0.5));
+                vec3 dbgPos = pos;
+                pos.xy = 2 * (pos.xy / vec2(size) - 0.5) * -pos.z;
 
+                vec4 prev_pos = mat_reproj * vec4(pos, 1);
+                prev_pos.xy = 0.5 * (prev_pos.xy / -prev_pos.z + 1) * vec2(size);
+
+                //imageStore(img_debug, ipos, vec4(abs(prev_pos.xyz - dbgPos) * vec3(0.1, 0.1, 1), 0));
                 ivec2 ipos_prev = ivec2(prev_pos.xy);
                 vec2 features_prev = imageLoad(tex_volume_prev, ipos_prev).rg;
 
-                float w = saturate(1 - abs(prev_pos.z - features_prev.x) / features_prev.y);
+                float w = saturate(1 - abs(-prev_pos.z - features_prev.x) / features_prev.y);
                 color_prev += imageLoad(tex_color_prev, ipos_prev) * w;
                 moments_prev += imageLoad(tex_moments_prev, ipos_prev).rg * w;
                 histlen += imageLoad(tex_history_length, ipos_prev).r * w;
@@ -96,9 +102,18 @@ void main()
                 sum_w += w;
             }
         }
+        else
+        {
+            // this pixel missed the cloud completely and is actually skybox
+            sum_w = 1;
+            color_prev = vec4(color_curr, 0);
+            moments_prev = moments_curr;
+            histlen = 4; // threshold for temporal variance estimate
+        }
     }
 	else if (pos_prev.x >= 0 && pos_prev.y >= 0 && mesh_id_curr != 0)
 	{
+		// bilinear interpolation, check each tap individually, renormalize afterwards
         for (int yy = 0; yy <= 1; yy++) {
             for (int xx = 0; xx <= 1; xx++) {
                 ivec2 ipos_prev    = p + ivec2(xx, yy);
@@ -181,8 +196,10 @@ void main()
 		imageStore(img_histlen, ipos, vec4(clamp(1.0 / alpha_color, 0.0, float(MAX_HISTLEN))));
 		#else
 		imageStore(img_histlen, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0)));
+		imageStore(img_debug, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0) / MAX_HISTLEN));
 		#endif
-		imageStore(img_acc_volume, ipos, vec4(mix(cloud_prev, cloud_curr, alpha_color), 0, 0));
+        float alpha_volume  = max(0.01 / CLOUD_SAMPLE_COUNT, 1.0 / (histlen + CLOUD_SAMPLE_COUNT));
+		imageStore(img_acc_volume, ipos, vec4(mix(cloud_prev, cloud_curr, alpha_volume), 0, 0));
 	}
 	else
 	{
