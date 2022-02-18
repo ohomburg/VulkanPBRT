@@ -306,6 +306,8 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine 
     return ( sampleSkybox(w) + sampleLight(w) );
 }
 
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+
 vec2 GetPrimaryStats(vec3 x, vec3 w)
 {
     // Ray march to get transmittance-weighted depth
@@ -315,32 +317,32 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
     // tMin is always zero (intersection shader reports accurate hit location)
     vec3 delta = w * tMax / STEPS;
     x += 0.5 * delta;
-    float mean = 0, var = 0, sum_w = 0, sum_w2 = 0;
-    float trans = 1;
-    float init_dist = distance(gl_ObjectToWorldEXT * vec4(x, 1), gl_WorldRayOriginEXT);
-    float delta_dist = length(gl_ObjectToWorldEXT * vec4(delta, 0));
+    float16_t mean = float16_t(0), var = float16_t(0), sum_w = float16_t(0), sum_w2 = float16_t(0);
+    float16_t trans = float16_t(1);
+    float16_t init_dist = float16_t(distance(gl_ObjectToWorldEXT * vec4(x, 1), gl_WorldRayOriginEXT));
+    float16_t delta_dist = float16_t(length(gl_ObjectToWorldEXT * vec4(delta, 0)));
     // Iterative weighted mean and variance, after West 1979, https://doi.org/10.1145/359146.359153
     for (uint i = 0; i < STEPS; i++)
     {
         vec3 loc = x + i * delta;
-        float d = init_dist + i * delta_dist;
-        float density = textureLod(gridImage[gl_InstanceCustomIndexEXT], loc, 0).x;
+        float16_t d = init_dist + float16_t(i) * delta_dist;
+        float16_t density = float16_t(textureLod(gridImage[gl_InstanceCustomIndexEXT], loc, 0).x);
 
         // Weight = Amount of energy flow to camera = Transmittance times Scattering = transmittance * const * density.
         // Constant factor is normalized away through the weight sum, so ignore it.
-        float w = trans * density;
-        trans *= exp(-density * parameters.extinction.x);
+        float16_t w = trans * density;
+        trans *= exp(-density * float16_t(parameters.extinction.x));
 
         sum_w += w;
         sum_w2 += w * w;
-        float old_mean = mean;
+        float16_t old_mean = mean;
         // clamp to get rid of NaN, HACK: this relies on unspecified behavior
-        mean += clamp(w / sum_w, 0, 1) * (d - old_mean);
+        mean += clamp(w / sum_w, float16_t(0), float16_t(1)) * (d - old_mean);
         var += w * (d - old_mean) * (d - mean);
     }
     // use reliability variance
     var /= sum_w - sum_w2 / sum_w;
-    return vec2(mean, var);
+    return vec2(float(mean), float(var));
 }
 
 void main()

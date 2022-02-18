@@ -36,7 +36,7 @@ namespace vsgXchange
     class xyz : public vsg::Inherit<vsg::ReaderWriter, xyz>
     {
     public:
-        xyz(bool use16bit = false);
+        xyz(bool use16bit = true);
 
         vsg::ref_ptr<vsg::Object> read(const vsg::Path& filename, vsg::ref_ptr<const vsg::Options> options = {}) const override;
         vsg::ref_ptr<vsg::Object> read(std::istream& fin, vsg::ref_ptr<const vsg::Options> options = {}) const override;
