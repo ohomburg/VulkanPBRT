@@ -196,7 +196,6 @@ void main()
 		imageStore(img_histlen, ipos, vec4(clamp(1.0 / alpha_color, 0.0, float(MAX_HISTLEN))));
 		#else
 		imageStore(img_histlen, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0)));
-		imageStore(img_debug, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0) / MAX_HISTLEN));
 		#endif
         float alpha_volume  = max(0.01 / CLOUD_SAMPLE_COUNT, 1.0 / (histlen + CLOUD_SAMPLE_COUNT));
 		imageStore(img_acc_volume, ipos, vec4(mix(cloud_prev, cloud_curr, alpha_volume), 0, 0));
@@ -213,5 +212,5 @@ void main()
 #endif
         imageStore(img_acc_volume, ipos, vec4(cloud_curr, 0, 0));
 	}
-
+    imageStore(img_debug, ipos, vec4(cloud_curr * vec2(0.2, 10), 0, 0));
 }
