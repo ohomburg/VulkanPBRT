@@ -124,7 +124,7 @@ ivec3 imgDims = textureSize(gridImage[gl_InstanceCustomIndexEXT], 0);
 float sampleCloud(in vec3 pos, inout RandomEngine re)
 {
     vec3 coord = pos;
-    coord += vec3(randomFloat(re) - 0.5, randomFloat(re) - 0.5, randomFloat(re) - 0.5) / imgDims;
+    //coord += vec3(randomFloat(re) - 0.5, randomFloat(re) - 0.5, randomFloat(re) - 0.5) / imgDims;
     return textureLod(gridImage[gl_InstanceCustomIndexEXT], coord, 0).x;
 }
 
