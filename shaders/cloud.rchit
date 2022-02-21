@@ -317,10 +317,11 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
     // tMin is always zero (intersection shader reports accurate hit location)
     vec3 delta = w * tMax / STEPS;
     x += 0.5 * delta;
-    float16_t mean = float16_t(0), var = float16_t(0), sum_w = float16_t(0), sum_w2 = float16_t(0);
+    float16_t mean = float16_t(0), sum_w = float16_t(0);
     float16_t trans = float16_t(1);
     float16_t init_dist = float16_t(distance(gl_ObjectToWorldEXT * vec4(x, 1), gl_WorldRayOriginEXT));
     float16_t delta_dist = float16_t(length(gl_ObjectToWorldEXT * vec4(delta, 0)));
+    float16_t dist1 = float16_t(1.0/0.0), dist0 = float16_t(0);
     // Iterative weighted mean and variance, after West 1979, https://doi.org/10.1145/359146.359153
     for (uint i = 0; i < STEPS; i++)
     {
@@ -332,17 +333,16 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
         // Constant factor is normalized away through the weight sum, so ignore it.
         float16_t w = trans * density;
         trans *= exp(density * -float16_t(parameters.extinction.x / STEPS));
+        if (w > float16_t(0.01))
+        {
+            dist1 = min(dist1, d);
+            dist0 = max(dist0, d);
+        }
 
         sum_w += w;
-        sum_w2 += w * w;
-        float16_t old_mean = mean;
-        // clamp to get rid of NaN, HACK: this relies on unspecified behavior
-        mean += clamp(w / sum_w, float16_t(0), float16_t(1)) * (d - old_mean);
-        var += w * (d - old_mean) * (d - mean);
+        mean += w * d;
     }
-    // use reliability variance
-    var /= sum_w - sum_w2 / sum_w;
-    return vec2(float(mean), sqrt(float(var)));
+    return vec2(float(mean)/float(sum_w), float(dist0 - dist1));
 }
 
 void main()
