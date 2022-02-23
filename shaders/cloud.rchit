@@ -254,7 +254,8 @@ vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine 
 
         float pdf_x = 1;
 
-	    while (true) {
+        uint max_steps = 2000;
+	    while (max_steps-- > 0) {
             float t = -log(max(0.0000000001, 1 - randomFloat(re)))/majorant;
 
             if (t > d)
