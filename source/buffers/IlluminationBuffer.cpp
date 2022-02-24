@@ -79,7 +79,7 @@ void IlluminationBufferFinal::fillImages()
 {
     auto image = vsg::Image::create();
     image->imageType = VK_IMAGE_TYPE_2D;
-    image->format = VK_FORMAT_B8G8R8A8_UNORM;
+    image->format = VK_FORMAT_R32G32B32A32_SFLOAT;
     image->extent.width = width;
     image->extent.height = height;
     image->extent.depth = 1;
