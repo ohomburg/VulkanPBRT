@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_shader_explicit_arithmetic_types : require
 
 #include "ptStructures.glsl"
 #include "ptConstants.glsl"
@@ -28,7 +29,10 @@ layout(binding = 26) uniform Infos{
     vec3 sun_intensity;
 } parameters;
 
-const float phaseG = 0.857;
+layout(constant_id=0) const int BUNDLE_SZ = 1;
+layout(constant_id=1) const float phaseG = 0.857;
+layout(constant_id=2) const float extinction = 1024;
+layout(constant_id=3) const float scatteringAlbedo = 1;
 
 /*
 Taken from https://github.com/lleonart1984/vulkansimplecloudrendering
@@ -171,143 +175,107 @@ vec3 sampleSkybox(vec3 direction)
 	return mix(lower_color, upper_color, weight);
 }
 
-// Pathtracing with Delta tracking and Spectral tracking
-vec3 PathtraceSpectral(vec3 x, vec3 w, inout RandomEngine re)
+vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout RandomEngine re)
 {
-    float majorant = maxComponent(parameters.extinction);
+    float majorant = extinction;
+    float absorptionAlbedo = 1 - scatteringAlbedo;
+    float PA = absorptionAlbedo * extinction;
+    float PS = scatteringAlbedo * extinction;
 
-    vec3 weights = vec3(1,1,1);
+    float tMin[BUNDLE_SZ], tMax[BUNDLE_SZ];
+    vec3 x[BUNDLE_SZ], w[BUNDLE_SZ];
+    for (uint i = 0; i < BUNDLE_SZ; i++) { x[i] = x_in; w[i] = w_in; }
+    bool running[BUNDLE_SZ];
+    uint runCount = 0;
+    vec3 acc = vec3(0);
 
-    vec3 absorptionAlbedo = vec3(1,1,1) - parameters.scatteringAlbedo;
-    vec3 scatteringAlbedo = parameters.scatteringAlbedo;
-    float PA = maxComponent (absorptionAlbedo * parameters.extinction);
-    float PS = maxComponent (scatteringAlbedo * parameters.extinction);
-
-    float tMin, tMax;
-    if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
+    if (rayBoxIntersect(vec3(0), vec3(1), x_in, w_in, tMin[0], tMax[0]))
     {
-        x += w * tMin;
-        float d = tMax - tMin;
-	    while (true) {
-            float t = -log(max(0.0000000001, 1 - randomFloat(re)))/majorant;
+        runCount = BUNDLE_SZ;
+        for (uint i = 0; i < BUNDLE_SZ; i++)
+        {
+            running[i] = true;
+            tMin[i] = tMin[0];
+            tMax[i] = tMax[0];
+        }
 
-            if (t > d)
-                break;
-
-            x += w * t;
-
-            float density = sampleCloud(x, re);
-
-            vec3 sigma_a = absorptionAlbedo * parameters.extinction * density;
-            vec3 sigma_s = scatteringAlbedo * parameters.extinction * density;
-            vec3 sigma_n = vec3(majorant) - parameters.extinction * density;
-
-            float Pa = maxComponent(sigma_a);
-            float Ps = maxComponent(sigma_s);
-            float Pn = maxComponent(sigma_n);
-            float C = Pa + Ps + Pn;
-            Pa /= C;
-            Ps /= C;
-            Pn /= C;
-
-            float xi = randomFloat(re);
-
-            if (xi < Pa)
-                return vec3(0); // weights * sigma_a / (majorant * Pa) * L_e; // 0 - No emission
-
-            if (xi < 1 - Pn) // scattering event
-            {
-                float pdf_w;
-                w = ImportanceSamplePhase(phaseG, w, pdf_w, re);
-                if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
-                {
-                    x += w*tMin;
-                    d = tMax - tMin;
-                }
-                weights *= sigma_s / (majorant * Ps);
-            }
-            else {
-                d -= t;
-                weights *= sigma_n / (majorant * Pn);
-            }
-	    }
-    }
-
-    return min(weights, vec3(100000,100000,100000)) * ( sampleSkybox(w) + sampleLight(w) );
-}
-
-vec3 Pathtrace(vec3 x, vec3 w, out ScatterEvent first_event, inout RandomEngine re)
-{
-    first_event = ScatterEvent( false, x, 0.0f, w, 0.0f );
-
-    float majorant = parameters.extinction.x;
-    float absorptionAlbedo = 1 - parameters.scatteringAlbedo.x;
-    float scatteringAlbedo = parameters.scatteringAlbedo.x;
-    float PA = absorptionAlbedo * parameters.extinction.x;
-    float PS = scatteringAlbedo * parameters.extinction.x;
-
-    float tMin, tMax;
-    if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
-    {
-        x += w * tMin;
-        float d = tMax - tMin;
-
-        float pdf_x = 1;
+        for (uint i = 0; i < BUNDLE_SZ; i++) x[i] += w[i] * tMin[i];
+        float d[BUNDLE_SZ];
+        for (uint i = 0; i < BUNDLE_SZ; i++) d[i] = tMax[i] - tMin[i];
 
         uint max_steps = 2000;
-	    while (max_steps-- > 0) {
-            float t = -log(max(0.0000000001, 1 - randomFloat(re)))/majorant;
+        while (runCount > 0 && max_steps-- > 0) {
+            float t[BUNDLE_SZ];
+            for (uint i = 0; i < BUNDLE_SZ; i++) t[i] = -log(max(0.0000000001, 1 - randomFloat(re))) / majorant;
 
-            if (t > d)
-                break;
-
-            x += w * t;
-
-            float density = sampleCloud(x, re);
-
-            float sigma_a = PA * density;
-            float sigma_s = PS * density;
-            float sigma_n = majorant - parameters.extinction.x * density;
-
-            float Pa = sigma_a/majorant;
-            float Ps = sigma_s/majorant;
-            float Pn = sigma_n/majorant;
-
-            float xi = randomFloat(re);
-
-            if (xi < Pa)
-                return vec3(0); // weights * sigma_a / (majorant * Pa) * L_e; // 0 - No emission
-
-            if (xi < 1 - Pn) // scattering event
-            {
-                float pdf_w;
-                w = ImportanceSamplePhase(phaseG, w, pdf_w, re);
-
-                if (!first_event.hasValue) {
-                    first_event.x = x;
-                    first_event.pdf_x = sigma_s * pdf_x;
-                    first_event.w = w;
-                    first_event.pdf_w = pdf_w;
-                    first_event.hasValue = true;
-                }
-
-                if (rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax))
+            for (uint i = 0; i < BUNDLE_SZ; i++)
+                if (running[i] && t[i] > d[i])
                 {
-                    x += w*tMin;
-                    d = tMax - tMin;
+                    acc += sampleSkybox(w[i]) + sampleLight(w[i]);
+                    running[i] = false;
+                    runCount--;
+                }
+
+            for (uint i = 0; i < BUNDLE_SZ; i++) x[i] += w[i] * t[i];
+
+            float16_t density[BUNDLE_SZ];
+            for (uint i = 0; i < BUNDLE_SZ; i++) density[i] = float16_t(sampleCloud(x[i], re));
+
+            float16_t sigma_a[BUNDLE_SZ];
+            float16_t sigma_s[BUNDLE_SZ];
+            float16_t sigma_n[BUNDLE_SZ];
+            for (uint i = 0; i < BUNDLE_SZ; i++) sigma_a[i] = float16_t(PA) * density[i];
+            for (uint i = 0; i < BUNDLE_SZ; i++) sigma_s[i] = float16_t(PS) * density[i];
+            for (uint i = 0; i < BUNDLE_SZ; i++) sigma_n[i] = float16_t(extinction) * (float16_t(1) - density[i]);
+
+            float Pa[BUNDLE_SZ];
+            float Ps[BUNDLE_SZ];
+            float Pn[BUNDLE_SZ];
+            for (uint i = 0; i < BUNDLE_SZ; i++) Pa[i] = sigma_a[i] / float16_t(majorant);
+            for (uint i = 0; i < BUNDLE_SZ; i++) Ps[i] = sigma_s[i] / float16_t(majorant);
+            for (uint i = 0; i < BUNDLE_SZ; i++) Pn[i] = sigma_n[i] / float16_t(majorant);
+
+            float16_t xi[BUNDLE_SZ];
+            for (uint i = 0; i < BUNDLE_SZ; i++) xi[i] = float16_t(randomFloat(re));
+
+            for (uint i = 0; i < BUNDLE_SZ; i++)
+            {
+                if (xi[i] < Pa[i])
+                {
+                    running[i] = false;
+                    runCount--;
+                }
+
+                if (xi[i] < 1 - Pn[i]) // scattering event
+                {
+                    float pdf_w;
+                    w[i] = ImportanceSamplePhase(phaseG, w[i], pdf_w, re);
+
+                    if (rayBoxIntersect(vec3(0), vec3(1), x[i], w[i], tMin[i], tMax[i]))
+                    {
+                        x[i] += w[i] * tMin[i];
+                        d[i] = tMax[i] - tMin[i];
+                    }
+                }
+                else
+                {
+                    d[i] -= t[i];
                 }
             }
-            else {
-                pdf_x *= exp(-parameters.extinction.x * density);
-                d -= t;
-            }
-	    }
+        }
+    }
+    else
+    {
+        return sampleSkybox(w_in) + sampleLight(w_in);
     }
 
-    return ( sampleSkybox(w) + sampleLight(w) );
-}
+    if (runCount > 0)
+        for (uint i = 0; i < BUNDLE_SZ; i++)
+            if (running[i])
+                acc += sampleSkybox(w[i]) + sampleLight(w[i]);
 
-#extension GL_EXT_shader_explicit_arithmetic_types : require
+    return acc / BUNDLE_SZ;
+}
 
 vec2 GetPrimaryStats(vec3 x, vec3 w)
 {
@@ -333,7 +301,7 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
         // Weight = Amount of energy flow to camera = Transmittance times Scattering = transmittance * const * density.
         // Constant factor is normalized away through the weight sum, so ignore it.
         float16_t w = trans * density;
-        trans *= exp(density * -float16_t(parameters.extinction.x / STEPS));
+        trans *= exp(density * -float16_t(extinction / STEPS));
         if (w > float16_t(0.01))
         {
             dist1 = min(dist1, d);
@@ -353,10 +321,15 @@ void main()
     vec3 w = normalize(gl_ObjectRayDirectionEXT);
     vec3 x = gl_ObjectRayOriginEXT + gl_ObjectRayDirectionEXT * gl_HitTEXT;
 
+    vec2 stats = GetPrimaryStats(x, w);
     // Perform a single path and get radiance
     ScatterEvent first_event;
-    vec3 result = Pathtrace(x, w, first_event, re);
-    vec2 stats = GetPrimaryStats(x, w);
+
+    vec3 result;
+    if (!any(isnan(stats)) && !any(isinf(stats)))
+        result = PathtraceBundle(x, w, re);
+    else
+        result = sampleSkybox(w) + sampleLight(w);
 
     rayPayload.position = first_event.hasValue ? (gl_ObjectToWorldEXT * vec4(first_event.x, 1)) : vec3(1/0);
     rayPayload.si.emissiveColor = result;
@@ -371,55 +344,3 @@ void main()
     rayPayload.si.normal = vec3(-1);
     rayPayload.si.basis = mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
 }
-
-/*
-Unprocessed old stuff. Kept around for reference.
-
-layout (binding = 2) uniform Parameters {
-    // Transform from Projection space to world space
-    mat4 proj2world;
-
-    // Cloud properties
-    vec3 box_minim;
-    vec3 box_maxim;
-
-    vec3 extinction;
-    vec3 scatteringAlbedo;
-    float phaseG;
-
-    // Sky properties
-    vec3 sun_direction;
-    vec3 sun_intensity;
-
-} parameters;
-
-layout (binding = 3) uniform FrameInfo
-{
-    uint frameCount;
-    uvec3 other;
-} frameInfo;
-
-layout (binding = 4, rgba32f) uniform image2D accImage;
-
-layout (binding = 5, rgba32f) uniform image2D firstX;
-
-layout (binding = 6, rgba32f) uniform image2D firstW;
-
-//--- Tools
-
-// NOTE: hopefully covered by raygen shader
-void createCameraRay(in vec2 coord, out vec3 x, out vec3 w)
-{
-    vec4 ndcP = vec4(coord, 0, 1);
-	ndcP.y *= -1;
-	vec4 ndcT = ndcP + vec4(0, 0, 1, 0);
-
-	vec4 viewP = parameters.proj2world * ndcP;
-	viewP.xyz /= viewP.w;
-	vec4 viewT = parameters.proj2world * ndcT;
-	viewT.xyz /= viewT.w;
-
-	x = viewP.xyz;
-	w = normalize(viewT.xyz - viewP.xyz);
-}
-*/
