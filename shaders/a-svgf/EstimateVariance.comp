@@ -75,7 +75,7 @@ void main()
 					ivec2 p = ipos + ivec2(xx, yy);
 					vec4 c_p = imageLoad(img_accumulated, p);
 
-					float l = luminance(c.rgb);
+					float l = luminance(c_p.rgb);
 
 					float z_p = abs(imageLoad(tex_vbuf_curr, p).x);
 					vec3 n_p = uncompress_normal(imageLoad(tex_normal_curr, p).rg);
