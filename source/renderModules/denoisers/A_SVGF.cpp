@@ -98,7 +98,6 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {6, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
-        {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {8, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
         {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
@@ -127,7 +126,6 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
     accum_moments_prev = createImage(width, height, VK_FORMAT_R32G32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     accum_histlen = createImage(width, height, VK_FORMAT_R16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     accum_histlen_prev = createImage(width, height, VK_FORMAT_R16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    accum_volume = createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     accum_volume_prev = createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     varA = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     varB = createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
@@ -163,7 +161,6 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         vsg::DescriptorImage::create(accum_color, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_moments, 5, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_histlen, 6, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(accum_volume, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(varA, 8, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(varB, 9, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     };
@@ -175,7 +172,6 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
         vsg::DescriptorImage::create(accum_color, 4, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_moments, 5, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(accum_histlen, 6, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
-        vsg::DescriptorImage::create(accum_volume, 7, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(varB, 8, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE),
         vsg::DescriptorImage::create(varA, 9, 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     };
@@ -362,7 +358,7 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
     }};
     commandGraph->addChild(copyCmd);
     copyCmd = vsg::CopyImage::create();
-    copyCmd->srcImage = accum_volume->imageView->image;
+    copyCmd->srcImage = bindDescriptorSet0->descriptorSet->descriptors[15].cast<vsg::DescriptorImage>()->imageInfoList[0]->imageView->image;
     copyCmd->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
     copyCmd->dstImage = accum_volume_prev->imageView->image;
     copyCmd->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -387,7 +383,7 @@ void A_SVGF::updateImageLayouts(vsg::Context &context)
     auto barr = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
 
     VkImageSubresourceRange rr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_volume, accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist, debug_img})
+    for (auto& img : {diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist, debug_img})
     {
         barr->add(vsg::ImageMemoryBarrier::create(VK_ACCESS_NONE_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0, img->imageView->image, rr));
     }

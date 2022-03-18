@@ -111,7 +111,6 @@ layout(set=1, binding=3, rgba32f) uniform image2D img_diffB2;
 layout(set=1, binding=4, rgba16f) uniform image2D img_accumulated;
 layout(set=1, binding=5, rg32f) uniform image2D img_moments;
 layout(set=1, binding=6, r16f) uniform image2D img_histlen;
-layout(set=1, binding=7, rgba32f) uniform image2D img_acc_volume;
 
 // output from EstimateVariance
 layout(set=1, binding=8, rgba16f) uniform image2D img_varianceA;

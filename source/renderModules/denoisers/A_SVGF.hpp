@@ -119,7 +119,7 @@ private:
     vsg::ref_ptr<vsg::BindDescriptorSet> bindDescriptorSet0, bindDescriptorSet1A, bindDescriptorSet1B;
 
     // Resources
-    vsg::ref_ptr<vsg::ImageInfo> diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen, accum_volume,
+    vsg::ref_ptr<vsg::ImageInfo> diffA1, diffA2, diffB1, diffB2, accum_color, accum_moments, accum_histlen,
         accum_moments_prev, accum_histlen_prev, accum_volume_prev, varA, varB, color_hist, debug_img;
 
     vsg::ref_ptr<vsg::mat4Value> projConstantValue;
