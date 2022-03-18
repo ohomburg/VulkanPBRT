@@ -57,6 +57,8 @@ void main()
 		return;
 	}
 
+	float dv_center = imageLoad(tex_volume_curr, ipos).x;
+
     uint mesh_id_center = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
 	if (histlen < hist_len_thresh && mesh_id_center != 0)
 	{
@@ -85,7 +87,10 @@ void main()
 
 					uint mesh_id_p = floatBitsToUint(imageLoad(tex_vbuf_curr, p).y);
 
-					float w = exp(- w_z) * w_n * (mesh_id_center == mesh_id_p ? 1.0 : 0.0);
+                    float dv_p = imageLoad(tex_volume_curr, p).x;
+                    float w_v = mesh_id_center >= 0x80000000 ? exp(-abs(dv_p - dv_center)) : 1;
+
+					float w = w_v * exp(- w_z) * w_n * (mesh_id_center == mesh_id_p ? 1.0 : 0.0);
 
 					if(isnan(w))
 						w = 0.0;
