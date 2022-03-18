@@ -88,7 +88,7 @@ void main()
 					uint mesh_id_p = floatBitsToUint(imageLoad(tex_vbuf_curr, p).y);
 
                     float dv_p = imageLoad(tex_volume_curr, p).x;
-                    float w_v = mesh_id_center >= 0x80000000 ? exp(-abs(dv_p - dv_center)) : 1;
+                    float w_v = exp(-abs(dv_p - dv_center));
 
 					float w = w_v * exp(- w_z) * w_n * (mesh_id_center == mesh_id_p ? 1.0 : 0.0);
 
