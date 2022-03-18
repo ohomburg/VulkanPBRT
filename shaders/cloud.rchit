@@ -277,7 +277,7 @@ vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout RandomEngine re)
     return acc / BUNDLE_SZ;
 }
 
-vec2 GetPrimaryStats(vec3 x, vec3 w)
+vec3 GetPrimaryStats(vec3 x, vec3 w)
 {
     // Ray march to get transmittance-weighted depth
     const uint STEPS = 256;
@@ -311,7 +311,7 @@ vec2 GetPrimaryStats(vec3 x, vec3 w)
         sum_w += w;
         mean += w * d;
     }
-    return vec2(float(mean)/float(sum_w), float(dist0 - dist1));
+    return vec3(float(mean)/float(sum_w), float(dist1), float(dist0));
 }
 
 void main()
@@ -321,7 +321,7 @@ void main()
     vec3 w = normalize(gl_ObjectRayDirectionEXT);
     vec3 x = gl_ObjectRayOriginEXT + gl_ObjectRayDirectionEXT * gl_HitTEXT;
 
-    vec2 stats = GetPrimaryStats(x, w);
+    vec3 stats = GetPrimaryStats(x, w);
     // Perform a single path and get radiance
     ScatterEvent first_event;
 
@@ -337,7 +337,7 @@ void main()
     rayPayload.si.perceptualRoughness = 0;
     rayPayload.si.metalness = 0;
     rayPayload.si.alphaRoughness = 0;
-    rayPayload.si.reflectance0 = vec3(stats, 0); // re-using reflectance
+    rayPayload.si.reflectance0 = stats; // re-using reflectance
     rayPayload.si.reflectance90 = vec3(0);
     rayPayload.si.diffuseColor = vec3(0);
     rayPayload.si.specularColor = vec3(0);
