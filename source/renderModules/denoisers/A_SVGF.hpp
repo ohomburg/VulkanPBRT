@@ -79,7 +79,7 @@ public:
            vsg::ref_ptr<GradientProjector> gradProjector);
 
     void compile(vsg::Context&);
-    void addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph);
+    void addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph, vsg::ref_ptr<vsg::QueryPool> queryPool, std::vector<std::string> &queryNames);
     vsg::ref_ptr<vsg::DescriptorImage> getFinalDescriptorImage() const;
     void updateImageLayouts(vsg::Context& context);
     void updatePushConstants(vsg::dmat4 projMatrix, vsg::dmat4 viewMatrix);

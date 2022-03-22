@@ -196,7 +196,7 @@ void A_SVGF::compile(vsg::Context &ctx)
         desc->compile(ctx);
 }
 
-void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
+void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph, vsg::ref_ptr<vsg::QueryPool> queryPool, std::vector<std::string> &queryNames)
 {
     // Passes to run:
     // 1. Create Gradient Samples
@@ -224,6 +224,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
     commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 0, projConstantValue));
     commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 64, pushConstVal));
     commandGraph->addChild(vsg::Dispatch::create(gradTileWidth, gradTileHeight, 1));
+    commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+    queryNames.emplace_back("CrGradSam");
 
     auto pipelineBarrier = vsg::PipelineBarrier::create(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0);
     commandGraph->addChild(pipelineBarrier);
@@ -247,17 +249,23 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
         commandGraph->addChild(vsg::Dispatch::create(gradTileWidth, gradTileHeight, 1));
         commandGraph->addChild(pipelineBarrier);
     }
+    commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+    queryNames.emplace_back("AtrousGrad");
 
     // 3. Temporal Accumulation
     commandGraph->addChild(bindPipelines.tempAccum);
     commandGraph->addChild(bindDescriptorSet1A);
     commandGraph->addChild(vsg::Dispatch::create(tileWidth, tileHeight, 1));
     commandGraph->addChild(pipelineBarrier);
+    commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+    queryNames.emplace_back("TempAcc");
 
     // 4. Estimate Variance
     commandGraph->addChild(bindPipelines.estVariance);
     commandGraph->addChild(vsg::Dispatch::create(tileWidth, tileHeight, 1));
     commandGraph->addChild(pipelineBarrier);
+    commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+    queryNames.emplace_back("EstVar");
 
     if (NumIterations == 0)
     {
@@ -274,6 +282,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
                 {width, height, 1}
         }};
         commandGraph->addChild(copyCmd);
+        commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+        queryNames.emplace_back("CopyColor");
     }
 
     // 5. Atrous
@@ -295,6 +305,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
                     {width, height, 1}
             }};
             commandGraph->addChild(copyCmd);
+            commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+            queryNames.emplace_back("CopyColor");
         }
 
         // swap the textures around each iteration.
@@ -311,6 +323,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
         commandGraph->addChild(vsg::PushConstants::create(VK_SHADER_STAGE_COMPUTE_BIT, 64, pushConstVal));
         commandGraph->addChild(vsg::Dispatch::create(tileWidth, tileHeight, 1));
         commandGraph->addChild(pipelineBarrier);
+        commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+        queryNames.emplace_back(std::string("Atrous") + std::to_string(i));
     }
 
     if (NumIterations > 0 && HistoryTap == NumIterations - 1)
@@ -328,6 +342,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
                 {width, height, 1}
         }};
         commandGraph->addChild(copyCmd);
+        commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+        queryNames.emplace_back("CopyColor");
     }
 
     // copy accum to prev
@@ -370,6 +386,8 @@ void A_SVGF::addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph)
             {width, height, 1}
     }};
     commandGraph->addChild(copyCmd);
+    commandGraph->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+    queryNames.emplace_back("CopyHist");
 }
 
 vsg::ref_ptr<vsg::DescriptorImage> A_SVGF::getFinalDescriptorImage() const

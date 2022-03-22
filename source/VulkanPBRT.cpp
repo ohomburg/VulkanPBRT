@@ -168,7 +168,7 @@ int main(int argc, char **argv)
         bool useFlyNavigation = arguments.read("--fly");
 #ifdef _DEBUG
         // overwriting command line options for debug
-        windowTraits->debugLayer = true;
+        //windowTraits->debugLayer = true;
         windowTraits->width = 1800;
         windowTraits->height = 990;
 #endif
@@ -431,7 +431,13 @@ int main(int argc, char **argv)
         // image layout conversions and correct binding of different denoising tequniques
         // -------------------------------------------------------------------------------------
         vsg::CompileTraversal imageLayoutCompile(window);
+        vsg::ref_ptr<vsg::QueryPool> queryPool = vsg::QueryPool::create();
+        std::vector<std::string> queryNames = {};
+
         auto commands = vsg::Commands::create();
+        commands->addChild(vsg::ResetQueryPool::create(queryPool));
+        commands->addChild(vsg::WriteTimestamp::create(queryPool, 0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
+
         auto offlineGBufferStager = OfflineGBuffer::create();
         auto offlineIlluminationBufferStager = OfflineIllumination::create();
         if (vBuffer) {
@@ -441,19 +447,14 @@ int main(int argc, char **argv)
             gradientProjector->compile(imageLayoutCompile.context);
             gradientProjector->updateImageLayouts(imageLayoutCompile.context);
             gradientProjector->addDispatchToCommandGraph(commands);
+            commands->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+            queryNames.emplace_back("ProjGrad");
         }
-        vsg::ref_ptr<vsg::QueryPool> queryPool;
         if (pbrtPipeline)
         {
-            queryPool = vsg::QueryPool::create(); //standard init has 1 timestamp place
-            queryPool->queryCount = 2;
-            auto resetQuery = vsg::ResetQueryPool::create(queryPool);
-            auto write1 = vsg::WriteTimestamp::create(queryPool, 0, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
-            auto write2 = vsg::WriteTimestamp::create(queryPool, 1, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
-            commands->addChild(resetQuery);
-            commands->addChild(write1);
             pbrtPipeline->addTraceRaysToCommandGraph(commands, pushConstants);
-            commands->addChild(write2);
+            commands->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR));
+            queryNames.emplace_back("RT");
             illuminationBuffer = pbrtPipeline->getIlluminationBuffer();
         }
         else
@@ -474,6 +475,8 @@ int main(int argc, char **argv)
             else
                 accumulator = Accumulator::create(gBuffer, illuminationBuffer, !use_external_buffers);
             accumulator->addDispatchToCommandGraph(commands);
+            commands->addChild(vsg::WriteTimestamp::create(queryPool, queryPool->queryCount++, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT));
+            queryNames.emplace_back("Accum");
             accumulationBuffer = accumulator->accumulationBuffer;
             illuminationBuffer->compile(imageLayoutCompile.context);
             illuminationBuffer->updateImageLayouts(imageLayoutCompile.context);
@@ -599,7 +602,7 @@ int main(int argc, char **argv)
             a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer, gradientProjector);
             a_svgf->compile(imageLayoutCompile.context);
             a_svgf->updateImageLayouts(imageLayoutCompile.context);
-            a_svgf->addDispatchToCommandGraph(commands);
+            a_svgf->addDispatchToCommandGraph(commands, queryPool, queryNames);
             finalDescriptorImage = a_svgf->getFinalDescriptorImage();
             break;
         }
@@ -698,6 +701,13 @@ int main(int argc, char **argv)
         // waiting for image layout transitions
         imageLayoutCompile.context.waitForCompletion();
 
+        // write perf CSV header
+        for (const auto &name : queryNames) {
+            std::cout << name << ",";
+        }
+        std::cout << std::endl;
+        auto nsPerTick = static_cast<double>(device->getPhysicalDevice()->getProperties().limits.timestampPeriod);
+
         int frame_index = 0;
         int sample_index = 0;
         while(viewer->advanceToNextFrame() && (numFrames < 0 || frame_index < numFrames))
@@ -763,6 +773,14 @@ int main(int argc, char **argv)
                 frame_index++;
             }
             sample_index++;
+
+            // print perf data (microseconds)
+            auto perfRes = queryPool->getResults();
+            auto startTime = perfRes[0];
+            for (size_t i = 1; i < perfRes.size(); i++) {
+                std::cout << std::fixed << double(perfRes[i] - startTime) * nsPerTick * 0.001 << ",";
+            }
+            std::cout << std::endl;
         }
 
         // exporting all images
