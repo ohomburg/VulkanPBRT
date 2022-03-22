@@ -776,9 +776,8 @@ int main(int argc, char **argv)
 
             // print perf data (microseconds)
             auto perfRes = queryPool->getResults();
-            auto startTime = perfRes[0];
             for (size_t i = 1; i < perfRes.size(); i++) {
-                std::cout << std::fixed << double(perfRes[i] - startTime) * nsPerTick * 0.001 << ",";
+                std::cout << std::fixed << std::setprecision(2) << double(perfRes[i] - perfRes[i-1]) * nsPerTick * 0.001 << ",";
             }
             std::cout << std::endl;
         }
