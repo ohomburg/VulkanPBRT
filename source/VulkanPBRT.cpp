@@ -727,7 +727,7 @@ int main(int argc, char **argv)
             if (a_svgf)
                 a_svgf->updatePushConstants(perspective->transform(), lookAt->transform());
 
-            rayTracingPushConstantsValue->value().frameNumber= frame_index;
+            rayTracingPushConstantsValue->value().frameNumber = frame_index * samplesPerPixel + sample_index;
             rayTracingPushConstantsValue->value().sampleNumber = sample_index;
             guiValues->sampleNumber = sample_index;
 
