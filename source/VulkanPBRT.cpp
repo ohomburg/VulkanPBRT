@@ -134,6 +134,7 @@ int main(int argc, char **argv)
         auto matricesPath = arguments.value(std::string(), "--matrices");
         auto exportMatricesPath = arguments.value(std::string(), "--exportMatrices");
         auto sceneFilename = arguments.value(std::string(), "-i");
+        auto cameraPath = arguments.value(std::string(), "--cam");
         bool use_external_buffers = normalPath.size();
         bool exportIllumination = exportIlluminationPath.size();
         bool exportGBuffer = exportNormalPath.size() || exportDepthPath.size() || exportPositionPath.size() || exportAlbedoPath.size() || exportMaterialPath.size();
@@ -277,6 +278,33 @@ int main(int argc, char **argv)
             {
                 matrix.proj = vsg::mat4();
                 matrix.invProj = vsg::mat4();
+            }
+        }
+        std::vector<vsg::dvec3> camPositions;
+        if (!cameraPath.empty())
+        {
+            std::ifstream positionsFile{cameraPath};
+            if (!positionsFile)
+            {
+                std::cerr << "File could not be opened: " << cameraPath << std::endl;
+                return 1;
+            }
+            nlohmann::json positions;
+            positionsFile >> positions;
+            if (!positions.is_array())
+            {
+                std::cerr << "Camera positions file does not contain a JSON array" << std::endl;
+                return 1;
+            }
+
+            for (const auto& v : positions)
+            {
+                if (v.size() != 3)
+                {
+                    std::cerr << "Some position is not a 3d vector" << std::endl;
+                    return 1;
+                }
+                camPositions.emplace_back(v[0].get<double>(), v[1].get<double>(), v[2].get<double>());
             }
         }
 
@@ -713,6 +741,13 @@ int main(int argc, char **argv)
         while(viewer->advanceToNextFrame() && (numFrames < 0 || frame_index < numFrames))
         {
             viewer->handleEvents();
+            if (!camPositions.empty())
+            {
+                auto posIdx = (size_t)frame_index;
+                if (posIdx >= camPositions.size())
+                    posIdx = camPositions.size() - 1;
+                lookAt->eye = camPositions[posIdx];
+            }
             if ((vsg::mat4)vsg::lookAt(lookAt->eye, lookAt->center, lookAt->up) != rayTracingPushConstantsValue->value().prevView)
             {
                 // clear samples when the camera has moved
