@@ -7,7 +7,6 @@
 #include "ptStructures.glsl"
 #include "ptConstants.glsl"
 #include "layoutPTAccel.glsl"
-#include "random.glsl"
 #include "layoutPTPushConstants.glsl"
 #include "color.glsl"
 
@@ -33,6 +32,21 @@ layout(constant_id=0) const int BUNDLE_SZ = 1;
 layout(constant_id=1) const float phaseG = 0.857;
 layout(constant_id=2) const float extinction = 1024;
 layout(constant_id=3) const float scatteringAlbedo = 1;
+
+uint pcg32(inout uint state)
+{
+    // based on PCG reference C++ implementation.
+    uint x = (state = state * 747796405u + 2891336453u);
+    x ^= x >> ((x >> 28) + 4);
+    x *= 277803737u;
+    x ^= x >> 22;
+    return x;
+}
+
+float rand01(inout uint state)
+{
+    return uintBitsToFloat(0x3f800000u | (pcg32(state) & 0x007fffffu)) - 1.0;
+}
 
 /*
 Taken from https://github.com/lleonart1984/vulkansimplecloudrendering
@@ -70,9 +84,9 @@ void CreateOrthonormalBasis(vec3 D, out vec3 B, out vec3 T) {
 	T = normalize(cross(D, B));
 }
 
-vec3 randomDirection(vec3 D, inout RandomEngine re) {
-	float r1 = randomFloat(re);
-	float r2 = randomFloat(re) * 2 - 1;
+vec3 randomDirection(vec3 D, inout uint rngState) {
+	float r1 = rand01(rngState);
+	float r2 = rand01(rngState) * 2 - 1;
 	float sqrR2 = r2 * r2;
 	float two_pi_by_r1 = two_pi * r1;
 	float sqrt_of_one_minus_sqrR2 = sqrt(1.0 - sqrR2);
@@ -95,14 +109,14 @@ float invertcdf(float GFactor, float xi) {
 	return one_over_2g * (one_plus_g2 - t * t);
 }
 
-vec3 ImportanceSamplePhase(float GFactor, vec3 D, out float pdf, inout RandomEngine re) {
+vec3 ImportanceSamplePhase(float GFactor, vec3 D, out float pdf, inout uint rngState) {
 	if (abs(GFactor) < 0.001) {
         pdf = 1.0 / (4 * pi);
-		return randomDirection(-D, re);
+		return randomDirection(-D, rngState);
 	}
 
-	float phi = randomFloat(re) * 2 * pi;
-	float cosTheta = invertcdf(GFactor, randomFloat(re));
+	float phi = rand01(rngState) * 2 * pi;
+	float cosTheta = invertcdf(GFactor, rand01(rngState));
 	float sinTheta = sqrt(max(0, 1.0f - cosTheta * cosTheta));
 
 	vec3 t0, t1;
@@ -125,10 +139,10 @@ vec3 sampleLight(in vec3 dir){
 
 ivec3 imgDims = textureSize(gridImage[gl_InstanceCustomIndexEXT], 0);
 
-float sampleCloud(in vec3 pos, inout RandomEngine re)
+float sampleCloud(in vec3 pos, inout uint rngState)
 {
     vec3 coord = pos;
-    //coord += vec3(randomFloat(re) - 0.5, randomFloat(re) - 0.5, randomFloat(re) - 0.5) / imgDims;
+    //coord += vec3(rand01(rngState) - 0.5, rand01(rngState) - 0.5, rand01(rngState) - 0.5) / imgDims;
     return textureLod(gridImage[gl_InstanceCustomIndexEXT], coord, 0).x;
 }
 
@@ -175,7 +189,7 @@ vec3 sampleSkybox(vec3 direction)
 	return mix(lower_color, upper_color, weight);
 }
 
-vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout RandomEngine re)
+vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout uint rngState)
 {
     float majorant = extinction;
     float absorptionAlbedo = 1 - scatteringAlbedo;
@@ -206,7 +220,7 @@ vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout RandomEngine re)
         uint max_steps = 2000;
         while (runCount > 0 && max_steps-- > 0) {
             float t[BUNDLE_SZ];
-            for (uint i = 0; i < BUNDLE_SZ; i++) t[i] = -log(max(0.0000000001, 1 - randomFloat(re))) / majorant;
+            for (uint i = 0; i < BUNDLE_SZ; i++) t[i] = -log(max(0.0000000001, 1 - rand01(rngState))) / majorant;
 
             for (uint i = 0; i < BUNDLE_SZ; i++)
                 if (running[i] && t[i] > d[i])
@@ -219,7 +233,9 @@ vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout RandomEngine re)
             for (uint i = 0; i < BUNDLE_SZ; i++) x[i] += w[i] * t[i];
 
             float16_t density[BUNDLE_SZ];
-            for (uint i = 0; i < BUNDLE_SZ; i++) density[i] = float16_t(sampleCloud(x[i], re));
+            for (uint i = 0; i < BUNDLE_SZ; i++) density[i] = float16_t(sampleCloud(x[i], rngState));
+            // force loading all of these NOW by having a dependency chain. THIS HAS NO FUNCTION!
+            for (uint i = 0; i < BUNDLE_SZ; i++) if (density[i] < float16_t(0)) density[i] = density[(i+1) % BUNDLE_SZ];
 
             float16_t sigma_a[BUNDLE_SZ];
             float16_t sigma_s[BUNDLE_SZ];
@@ -236,7 +252,7 @@ vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout RandomEngine re)
             for (uint i = 0; i < BUNDLE_SZ; i++) Pn[i] = sigma_n[i] / float16_t(majorant);
 
             float16_t xi[BUNDLE_SZ];
-            for (uint i = 0; i < BUNDLE_SZ; i++) xi[i] = float16_t(randomFloat(re));
+            for (uint i = 0; i < BUNDLE_SZ; i++) xi[i] = float16_t(rand01(rngState));
 
             for (uint i = 0; i < BUNDLE_SZ; i++)
             {
@@ -249,7 +265,7 @@ vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout RandomEngine re)
                 if (xi[i] < 1 - Pn[i]) // scattering event
                 {
                     float pdf_w;
-                    w[i] = ImportanceSamplePhase(phaseG, w[i], pdf_w, re);
+                    w[i] = ImportanceSamplePhase(phaseG, w[i], pdf_w, rngState);
 
                     if (rayBoxIntersect(vec3(0), vec3(1), x[i], w[i], tMin[i], tMax[i]))
                     {
@@ -314,9 +330,26 @@ vec3 GetPrimaryStats(vec3 x, vec3 w)
     return vec3(float(mean)/float(sum_w), float(dist1), float(dist0));
 }
 
+// http://www.jcgt.org/published/0009/03/02/
+uvec3 pcg3d(uvec3 v) {
+    v = v * 1664525u + 1013904223u;
+
+    v.x += v.y*v.z;
+    v.y += v.z*v.x;
+    v.z += v.x*v.y;
+
+    v ^= v >> 16u;
+
+    v.x += v.y*v.z;
+    v.y += v.z*v.x;
+    v.z += v.x*v.y;
+
+    return v;
+}
+
 void main()
 {
-    RandomEngine re = rEInit(gl_LaunchIDEXT.xy, camParams.frameNumber);
+    uint rngState = pcg3d(uvec3(gl_LaunchIDEXT.xy, camParams.frameNumber)).x;
 
     vec3 w = normalize(gl_ObjectRayDirectionEXT);
     vec3 x = gl_ObjectRayOriginEXT + gl_ObjectRayDirectionEXT * gl_HitTEXT;
@@ -327,7 +360,7 @@ void main()
 
     vec3 result;
     if (!any(isnan(stats)) && !any(isinf(stats)))
-        result = PathtraceBundle(x, w, re);
+        result = PathtraceBundle(x, w, rngState);
     else
         result = sampleSkybox(w) + sampleLight(w);
 
