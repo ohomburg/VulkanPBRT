@@ -113,6 +113,9 @@ vsg::ref_ptr<vsg::Object> xyz::read(std::istream& fin, vsg::ref_ptr<const vsg::O
     mat(0, 0) = static_cast<float>(voxelSizeX * sizeX);
     mat(1, 1) = static_cast<float>(voxelSizeZ * sizeZ);
     mat(2, 2) = static_cast<float>(voxelSizeY * sizeY);
+    mat(3, 0) = -0.5f * mat(0, 0);
+    mat(3, 1) = -0.5f * mat(1, 1);
+    mat(3, 2) = -0.5f * mat(2, 2);
 
     container->addChild(vol);
     return container;

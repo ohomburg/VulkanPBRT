@@ -347,7 +347,7 @@ int main(int argc, char **argv)
 
         //create camera matrices
         auto perspective = vsg::Perspective::create(60, static_cast<double>(windowTraits->width) / static_cast<double>(windowTraits->height), .1, 1000);
-        auto lookAt = vsg::LookAt::create(vsg::dvec3(0.0, -3, 1), vsg::dvec3(0.0, 0.0, 1), vsg::dvec3(0.0, 0.0, 1.0));
+        auto lookAt = vsg::LookAt::create(vsg::dvec3(0.0, -2, 0), vsg::dvec3(0.0, 0.0, 0), vsg::dvec3(0.0, 0.0, 1.0));
 
         // set push constants
         auto rayTracingPushConstantsValue = RayTracingPushConstantsValue::create();
