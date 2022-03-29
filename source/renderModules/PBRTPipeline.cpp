@@ -24,7 +24,8 @@ namespace
 }
 
 PBRTPipeline::PBRTPipeline(vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<GBuffer> gBuffer,
-                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, vsg::ref_ptr<GradientProjector> gradProjector, bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin) :
+                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, vsg::ref_ptr<GradientProjector> gradProjector,
+                 bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin, vsg::CommandLine& args) :
     width(illuminationBuffer->illuminationImages[0]->imageInfoList[0]->imageView->image->extent.width),
     height(illuminationBuffer->illuminationImages[0]->imageInfoList[0]->imageView->image->extent.height),
     maxRecursionDepth(2),
@@ -34,7 +35,7 @@ PBRTPipeline::PBRTPipeline(vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<GBuffer> 
 {
     if (writeGBuffer) assert(gBuffer);
     bool useExternalGBuffer = rayTracingRayOrigin == RayTracingRayOrigin::GBUFFER;
-    setupPipeline(scene, useExternalGBuffer);
+    setupPipeline(scene, useExternalGBuffer, args);
 }
 void PBRTPipeline::setTlas(vsg::ref_ptr<vsg::AccelerationStructure> as)
 {
@@ -80,7 +81,7 @@ vsg::ref_ptr<IlluminationBuffer> PBRTPipeline::getIlluminationBuffer() const
 {
     return illuminationBuffer;
 }
-void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
+void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer, vsg::CommandLine& args)
 {
     // parsing data from scene
     RayTracingSceneDescriptorCreationVisitor buildDescriptorBinding;
@@ -118,6 +119,11 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer)
          anyHitShader->getDescriptorSetLayoutBindingsMap(),
          cloudHitShader->getDescriptorSetLayoutBindingsMap(),
          cloudIntShader->getDescriptorSetLayoutBindingsMap()});
+
+    cloudHitShader->specializationConstants = {
+            {0, vsg::intValue::create(args.value(1, "--vptBundle"))},
+            {4, vsg::intValue::create(args.value(2000, "--vptLimit"))},
+    };
 
     auto descriptorSetLayout = vsg::DescriptorSetLayout::create(bindingMap.begin()->second.bindings);
     // auto rayTracingPipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{descriptorSetLayout}, vsg::PushConstantRanges{{VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, sizeof(RayTracingPushConstants)}});

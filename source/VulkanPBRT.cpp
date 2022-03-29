@@ -170,8 +170,8 @@ int main(int argc, char **argv)
 #ifdef _DEBUG
         // overwriting command line options for debug
         //windowTraits->debugLayer = true;
-        windowTraits->width = 1800;
-        windowTraits->height = 990;
+        windowTraits->width = 1920;
+        windowTraits->height = 1080;
 #endif
         windowTraits->queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
         windowTraits->imageAvailableSemaphoreWaitFlag = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -431,7 +431,7 @@ int main(int argc, char **argv)
         }
         if(!use_external_buffers)
         {
-            pbrtPipeline = PBRTPipeline::create(loaded_scene, gBuffer, illuminationBuffer, gradientProjector, writeGBuffer, RayTracingRayOrigin::CAMERA);
+            pbrtPipeline = PBRTPipeline::create(loaded_scene, gBuffer, illuminationBuffer, gradientProjector, writeGBuffer, RayTracingRayOrigin::CAMERA, arguments);
 
             // setup tlas
             vsg::BuildAccelerationStructureTraversal buildAccelStruct(device);
@@ -627,7 +627,7 @@ int main(int argc, char **argv)
             }
             break;
         case DenoisingType::ASVGF: {
-            a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer, gradientProjector);
+            a_svgf = A_SVGF::create(windowTraits->width, windowTraits->height, gBuffer, illuminationBuffer, accumulationBuffer, gradientProjector, arguments);
             a_svgf->compile(imageLayoutCompile.context);
             a_svgf->updateImageLayouts(imageLayoutCompile.context);
             a_svgf->addDispatchToCommandGraph(commands, queryPool, queryNames);

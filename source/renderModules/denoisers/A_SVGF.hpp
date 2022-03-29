@@ -76,7 +76,7 @@ class A_SVGF : public vsg::Inherit<vsg::Object, A_SVGF> {
 public:
     A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
            vsg::ref_ptr<IlluminationBuffer> illuBuffer, vsg::ref_ptr<AccumulationBuffer> accBuffer,
-           vsg::ref_ptr<GradientProjector> gradProjector);
+           vsg::ref_ptr<GradientProjector> gradProjector, vsg::CommandLine&);
 
     void compile(vsg::Context&);
     void addDispatchToCommandGraph(vsg::ref_ptr<vsg::Commands> commandGraph, vsg::ref_ptr<vsg::QueryPool> queryPool, std::vector<std::string> &queryNames);

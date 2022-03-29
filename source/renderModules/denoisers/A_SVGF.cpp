@@ -52,9 +52,12 @@ vsg::ref_ptr<vsg::ImageInfo> createImage(uint32_t width, uint32_t height, VkForm
 
 A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
                vsg::ref_ptr<IlluminationBuffer> illuBuffer, vsg::ref_ptr<AccumulationBuffer> accBuffer,
-               vsg::ref_ptr<GradientProjector> gradProjector)
+               vsg::ref_ptr<GradientProjector> gradProjector, vsg::CommandLine& args)
     : width(width), height(height)
 {
+    NumIterations = args.value(5, "--atrousIters");
+    FilterKernel = args.value(1, "--atrousFilter");
+    TemporalAlpha = args.value(0.1f, "--tempAlpha");
     PerPass<const char*> shaderNames{"shaders/a-svgf/CreateGradientSamples.comp.spv",
                         "shaders/a-svgf/AtrousGradient.comp.spv",
                         "shaders/a-svgf/TemporalAccumulation.comp.spv",
@@ -67,6 +70,9 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
 
     shaderStages.atrous->specializationConstants = vsg::ShaderStage::SpecializationConstants{
         {0, vsg::intValue::create(FilterKernel)}
+    };
+    shaderStages.tempAccum->specializationConstants = {
+            {1, vsg::intValue::create(args.value(3, "--cloudReproPoints"))}
     };
 
     vsg::DescriptorSetLayoutBindings layoutBindings0 = {

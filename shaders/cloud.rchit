@@ -32,6 +32,7 @@ layout(constant_id=0) const int BUNDLE_SZ = 1;
 layout(constant_id=1) const float phaseG = 0.857;
 layout(constant_id=2) const float extinction = 1024;
 layout(constant_id=3) const float scatteringAlbedo = 1;
+layout(constant_id=4) const int STEP_LIMIT = 2000;
 
 uint pcg32(inout uint state)
 {
@@ -217,7 +218,7 @@ vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout uint rngState)
         float d[BUNDLE_SZ];
         for (uint i = 0; i < BUNDLE_SZ; i++) d[i] = tMax[i] - tMin[i];
 
-        uint max_steps = 2000;
+        uint max_steps = STEP_LIMIT;
         while (runCount > 0 && max_steps-- > 0) {
             float t[BUNDLE_SZ];
             for (uint i = 0; i < BUNDLE_SZ; i++) t[i] = -log(max(0.0000000001, 1 - rand01(rngState))) / majorant;

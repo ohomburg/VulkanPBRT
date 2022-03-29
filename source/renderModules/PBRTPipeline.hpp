@@ -21,7 +21,9 @@ class PBRTPipeline : public vsg::Inherit<vsg::Object, PBRTPipeline>
 {
 public:
     PBRTPipeline(vsg::ref_ptr<vsg::Node> scene, vsg::ref_ptr<GBuffer> gBuffer,
-                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, vsg::ref_ptr<GradientProjector> gradProjector, bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin);
+                 vsg::ref_ptr<IlluminationBuffer> illuminationBuffer, vsg::ref_ptr<GradientProjector> gradProjector,
+                 bool writeGBuffer, RayTracingRayOrigin rayTracingRayOrigin,
+                 vsg::CommandLine& args);
 
     void setTlas(vsg::ref_ptr<vsg::AccelerationStructure> as);
     void compile(vsg::Context& context);
@@ -34,7 +36,7 @@ public:
         SampleUniform
     }lightSamplingMethod = LightSamplingMethod::SampleSurfaceStrength;
 private:
-    void setupPipeline(vsg::Node* scene, bool useExternalGBuffer);
+    void setupPipeline(vsg::Node* scene, bool useExternalGBuffer, vsg::CommandLine& args);
     vsg::ref_ptr<vsg::ShaderStage> setupRaygenShader(std::string raygenPath, bool useExternalGBuffer);
 
     std::vector<uint32_t> geometryTypes;
