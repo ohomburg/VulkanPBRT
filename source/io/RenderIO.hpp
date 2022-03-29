@@ -68,7 +68,7 @@ class OfflineIllumination: public vsg::Inherit<vsg::Object, OfflineIllumination>
 public:
     vsg::ref_ptr<vsg::Data> noisy;
     void uploadToIlluminationBufferCommand(vsg::ref_ptr<IlluminationBuffer>& illuBuffer, vsg::ref_ptr<vsg::Commands>& commands, vsg::Context& context);
-    void downloadFromIlluminationBufferCommand(vsg::ref_ptr<IlluminationBuffer>& illuBuffer, vsg::ref_ptr<vsg::Commands>& commands, vsg::Context& context);
+    void downloadFromIlluminationBufferCommand(vsg::ref_ptr<vsg::DescriptorImage>& illuBuffer, vsg::ref_ptr<vsg::Commands>& commands, vsg::Context& context);
     void transferStagingDataTo(vsg::ref_ptr<OfflineIllumination>& illuBuffer);
     void transferStagingDataFrom(vsg::ref_ptr<OfflineIllumination>& illuBuffer);
 private:

@@ -663,7 +663,7 @@ int main(int argc, char **argv)
                 std::cout << "Final image layout is not compatible illumination buffer export" << std::endl;
                 return 1;
             }
-            offlineIlluminationBufferStager->downloadFromIlluminationBufferCommand(illuminationBuffer, commands, imageLayoutCompile.context);
+            offlineIlluminationBufferStager->downloadFromIlluminationBufferCommand(finalDescriptorImage, commands, imageLayoutCompile.context);
         }
         if (finalDescriptorImage->imageInfoList[0]->imageView->image->format != VK_FORMAT_B8G8R8A8_UNORM)
         {
