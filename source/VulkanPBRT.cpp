@@ -821,7 +821,7 @@ int main(int argc, char **argv)
         if (exportGBuffer)
             GBufferIO::exportGBuffer(exportPositionPath, exportDepthPath, exportNormalPath, exportMaterialPath, exportAlbedoPath, numFrames, offlineGBuffers, cameraMatrices);
         if (exportIllumination)
-            IlluminationBufferIO::exportIllumination(exportIlluminationPath, numFrames, offlineIlluminations);
+            IlluminationBufferIO::exportIllumination(exportIlluminationPath, numFrames, offlineIlluminations, 0);
         if (exportMatricesPath.size())
             MatrixIO::exportMatrices(exportMatricesPath, cameraMatrices);
     }
