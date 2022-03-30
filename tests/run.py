@@ -88,7 +88,10 @@ configs = {
     "filter_sub5": {"--denoiser": "asvgf", "--atrousFilter": 5},
 }
 
+config_idx = 1
 for name, overrides in configs.items():
+    print(name, f"({config_idx}/{len(configs)})")
+    config_idx += 1
     disabled_cases = overrides.get("disabled", [])
     for i, base_args in enumerate(cases):
         if i in disabled_cases:
