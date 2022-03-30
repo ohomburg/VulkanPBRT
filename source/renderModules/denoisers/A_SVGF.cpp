@@ -57,7 +57,7 @@ A_SVGF::A_SVGF(uint32_t width, uint32_t height, vsg::ref_ptr<GBuffer> gBuffer,
 {
     NumIterations = args.value(5, "--atrousIters");
     FilterKernel = args.value(1, "--atrousFilter");
-    TemporalAlpha = args.value(0.1f, "--tempAlpha");
+    TemporalAlpha = args.value(0.01f, "--tempAlpha");
     PerPass<const char*> shaderNames{"shaders/a-svgf/CreateGradientSamples.comp.spv",
                         "shaders/a-svgf/AtrousGradient.comp.spv",
                         "shaders/a-svgf/TemporalAccumulation.comp.spv",
