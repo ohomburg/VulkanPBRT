@@ -33,6 +33,7 @@ layout(constant_id=1) const float phaseG = 0.857;
 layout(constant_id=2) const float extinction = 1024;
 layout(constant_id=3) const float scatteringAlbedo = 1;
 layout(constant_id=4) const int STEP_LIMIT = 2000;
+layout(constant_id=5) const int STAT_STEPS = 256;
 
 uint pcg32(inout uint state)
 {
@@ -297,7 +298,7 @@ vec3 PathtraceBundle(vec3 x_in, vec3 w_in, inout uint rngState)
 vec3 GetPrimaryStats(vec3 x, vec3 w)
 {
     // Ray march to get transmittance-weighted depth
-    const uint STEPS = 256;
+    const uint STEPS = STAT_STEPS;
     float tMin, tMax;
     rayBoxIntersect(vec3(0, 0, 0), vec3(1, 1, 1), x, w, tMin, tMax);
     // tMin is always zero (intersection shader reports accurate hit location)

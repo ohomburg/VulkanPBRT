@@ -123,6 +123,7 @@ void PBRTPipeline::setupPipeline(vsg::Node *scene, bool useExternalGbuffer, vsg:
     cloudHitShader->specializationConstants = {
             {0, vsg::intValue::create(args.value(1, "--vptBundle"))},
             {4, vsg::intValue::create(args.value(1536, "--vptLimit"))},
+            {5, vsg::intValue::create(args.value(128, "--cloudStatSteps"))},
     };
 
     auto descriptorSetLayout = vsg::DescriptorSetLayout::create(bindingMap.begin()->second.bindings);
