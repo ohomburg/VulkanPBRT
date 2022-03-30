@@ -26,25 +26,34 @@ cases = [
     {"i": 1198, "-f": 10, "--spp": 1, "cam": 3, "export": "t5_%d"},
 ]
 
+
+# convenience function to set spp and disable superfluous test cases
+def set_spp(spp):
+    return {"--spp": spp, "disabled": [1, 3, 4]}
+
+
 configs = {
-    # "reference": {"--spp": 1024, "--vptLimit": 2**31 - 1},
-    # "limit512": {"--spp": 256, "--vptLimit": 512},
-    # "limit768": {"--spp": 256, "--vptLimit": 768},
-    # "limit1024": {"--spp": 256, "--vptLimit": 1024},
-    # "limit1536": {"--spp": 256, "--vptLimit": 1536},
-    # "limit2048": {"--spp": 256, "--vptLimit": 2048},
-    # "limitMax": {"--spp": 256, "--vptLimit": 2**31 - 1},
-    "alpha1e-1": {"--denoiser": "asvgf", "--tempAlpha": "0.1"},
-    "alpha5e-2": {"--denoiser": "asvgf", "--tempAlpha": "0.05"},
-    "alpha1e-2": {"--denoiser": "asvgf", "--tempAlpha": "0.01"},
-    "alpha5e-3": {"--denoiser": "asvgf", "--tempAlpha": "0.005"},
+    "reference": {"--vptLimit": 2**31 - 1, "--spp": 1024},
+    "limit512": {"--vptLimit": 512} | set_spp(256),
+    "limit768": {"--vptLimit": 768} | set_spp(256),
+    "limit1024": {"--vptLimit": 1024} | set_spp(256),
+    "limit1536": {"--vptLimit": 1536} | set_spp(256),
+    "limit2048": {"--vptLimit": 2048} | set_spp(256),
+    "alpha1e-1": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.1"},
+    "alpha5e-2": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.05"},
+    "alpha1e-2": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.01"},
+    "alpha5e-3": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.005"},
 }
 
 for name, overrides in configs.items():
+    disabled_cases = configs.get("disabled", [])
     for i, base_args in enumerate(cases):
+        if i in disabled_cases:
+            continue
+
         outdir = Path(os.getcwd(), name)
         outdir.mkdir(parents=True, exist_ok=True)
-        outname = Path(outdir, f"perf_{i}.csv")
+        outname = Path(outdir, f"out_{i}.txt")
 
         # merge arguments
         config = base_args | overrides
@@ -66,3 +75,11 @@ for name, overrides in configs.items():
             done = subprocess.run([exe_path] + args, stdout=outfile, cwd=os.path.dirname(exe_path))
             if done.returncode != 0:
                 print("Subprocess returned", hex(done.returncode), " ".join(args))
+
+refdir = Path(os.getcwd(), "reference")
+
+# run flip for quality comparison
+for name, overrides in configs.items():
+    outdir = Path(os.getcwd(), name)
+    for file in outdir.glob("*.exr"):
+        subprocess.run(["flip", "-r", Path(refdir, file.name), "-t", file, "-d", outdir, "-nexm", "-c", file.with_suffix(".flip.csv")])
