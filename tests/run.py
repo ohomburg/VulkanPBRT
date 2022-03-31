@@ -3,8 +3,6 @@ import sys
 import os
 from pathlib import Path
 
-# glorified shell script that runs a bunch of test cases.
-
 exe_path = sys.argv[1]
 data_path = sys.argv[2]
 
@@ -34,9 +32,9 @@ def set_spp(spp):
 
 configs = {
     "reference": {"--vptLimit": 2 ** 31 - 1, "--spp": 1024},
-    "fast": {"--denoiser": "asvgf", "--vptLimit": 1024, "--cloudReproPoints": 1, "--cloudStatSteps": 64, "--vptBundle": 1, "--atrousIters": 3, "--tempAlpha": "0.01"},
+    "fast": {"--denoiser": "asvgf", "--vptLimit": 1024, "--cloudReproPoints": 1, "--cloudStatSteps": 64, "--vptBundle": 1, "--atrousIters": 4},
     "balanced": {"--denoiser": "asvgf"},
-    "quality": {"--denoiser": "asvgf", "--vptLimit": 2 ** 31 - 1, "--cloudReproPoints": 1, "--cloudStatSteps": 256, "--vptBundle": 2, "--atrousIters": 5, "--tempAlpha": "0.01"},
+    "quality": {"--denoiser": "asvgf", "--vptLimit": 2 ** 31 - 1, "--cloudReproPoints": 1, "--cloudStatSteps": 256, "--vptBundle": 2, "--atrousIters": 5},
 
     "bundle2": {"--denoiser": "asvgf", "--vptBundle": 2},
     "bundle3": {"--denoiser": "asvgf", "--vptBundle": 3},
@@ -93,12 +91,13 @@ for name, overrides in configs.items():
     print(name, f"({config_idx}/{len(configs)})")
     config_idx += 1
     disabled_cases = overrides.get("disabled", [])
+
+    outdir = Path(os.getcwd(), name)
+    outdir.mkdir(parents=True, exist_ok=True)
     for i, base_args in enumerate(cases):
         if i in disabled_cases:
             continue
 
-        outdir = Path(os.getcwd(), name)
-        outdir.mkdir(parents=True, exist_ok=True)
         outname = Path(outdir, f"out_{i}.txt")
 
         # merge arguments
@@ -119,8 +118,14 @@ for name, overrides in configs.items():
             outfile.write(" ".join(args) + "\n")
             outfile.flush()
             done = subprocess.run([exe_path] + args, stdout=outfile, cwd=os.path.dirname(exe_path))
-            if done.returncode != 0:
-                print("Subprocess returned", hex(done.returncode), " ".join(args))
+
+    if 4 not in disabled_cases:
+        # delete extra pictures to reduce work for flip
+        files_to_delete = list(outdir.glob("t4_*.exr"))
+        files_to_delete.remove(Path(outdir, "t4_127.exr"))
+        files_to_delete.remove(Path(outdir, "t4_128.exr"))
+        for file in files_to_delete:
+            file.unlink()
 
 refdir = Path(os.getcwd(), "reference")
 
