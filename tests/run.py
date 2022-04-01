@@ -65,10 +65,10 @@ configs = {
     "repro3": {"--denoiser": "asvgf", "--cloudReproPoints": 3},
     "repro5": {"--denoiser": "asvgf", "--cloudReproPoints": 5},
 
-    "alpha1e-1": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.1"},
-    "alpha5e-2": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.05"},
-    "alpha1e-2": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.01"},
-    "alpha5e-3": {"--denoiser": "asvgf", "--atrousIters": 0, "--tempAlpha": "0.005"},
+    "alpha1e-1": {"--denoiser": "asvgf", "--atrousIters": 0, "disable": [0], "--tempAlpha": "0.1"},
+    "alpha5e-2": {"--denoiser": "asvgf", "--atrousIters": 0, "disable": [0], "--tempAlpha": "0.05"},
+    "alpha1e-2": {"--denoiser": "asvgf", "--atrousIters": 0, "disable": [0], "--tempAlpha": "0.01"},
+    "alpha5e-3": {"--denoiser": "asvgf", "--atrousIters": 0, "disable": [0], "--tempAlpha": "0.005"},
 
     "iters0": {"--denoiser": "asvgf", "--atrousIters": 0},
     "iters1": {"--denoiser": "asvgf", "--atrousIters": 1},
