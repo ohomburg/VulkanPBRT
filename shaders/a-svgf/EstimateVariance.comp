@@ -36,84 +36,75 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 void main()
 {
-	ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
-	vec2 m = imageLoad(img_moments, ipos).rg;
+    ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
+    vec2 m = imageLoad(img_moments, ipos).rg;
 
-	float histlen = imageLoad(img_histlen, ipos).r;
+    float histlen = imageLoad(img_histlen, ipos).r;
 
-	vec4 c = imageLoad(img_accumulated, ipos);
+    vec4 c = imageLoad(img_accumulated, ipos);
 
-	const float hist_len_thresh = 4.0;
+    const float hist_len_thresh = 4.0;
 
-	vec3 color_spatial = vec3(0);
-	vec2 moments_spatial = vec2(0);
-	vec2 moments_tempora = vec2(0);
-	float variance_spatial = 0.0;
+    float z_center = abs(imageLoad(tex_vbuf_curr, ipos).x);
+    float delta_z = abs(z_center - imageLoad(tex_vbuf_curr, ipos + ivec2(1, 0)).x);
+    if (z_center < 0) {
+        imageStore(img_varianceA, ipos, vec4(c.rgb, 0));
+        return;
+    }
 
-	float z_center = abs(imageLoad(tex_vbuf_curr, ipos).x);
-	float delta_z = abs(z_center - imageLoad(tex_vbuf_curr, ipos + ivec2(1, 0)).x);
-	if (z_center < 0) {
-		imageStore(img_varianceA, ipos, vec4(c.rgb, 0));
-		return;
-	}
-
-	float dv_center = imageLoad(tex_volume_curr, ipos).x;
+    float dv_center = imageLoad(tex_volume_curr, ipos).x;
 
     uint mesh_id_center = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
-	if (histlen < hist_len_thresh && mesh_id_center != 0)
-	{
-		{
-			float l = luminance(c.rgb);
-			m += vec2(l, l * l);
-		}
+    if (histlen < hist_len_thresh && mesh_id_center != 0)
+    {
+        {
+            float l = luminance(c.rgb);
+            m += vec2(l, l * l);
+        }
 
-		vec3 n_center = uncompress_normal(imageLoad(tex_normal_curr, ipos).rg);
+        vec3 n_center = uncompress_normal(imageLoad(tex_normal_curr, ipos).rg);
 
-		float sum_w = 1.0;
-		int r = histlen > 1 ? 2 : 3;
-		for(int yy = -r; yy <= r; yy++) {
-			for(int xx = -r; xx <= r; xx++) {
-				if(xx != 0 || yy != 0) {
-					ivec2 p = ipos + ivec2(xx, yy);
-					vec4 c_p = imageLoad(img_accumulated, p);
+        float sum_w = 1.0;
+        int r = histlen > 1 ? 2 : 3;
+        for(int yy = -r; yy <= r; yy++) {
+            for(int xx = -r; xx <= r; xx++) {
+                if(xx != 0 || yy != 0) {
+                    ivec2 p = ipos + ivec2(xx, yy);
+                    vec4 c_p = imageLoad(img_accumulated, p);
 
-					float l = luminance(c_p.rgb);
+                    float l = luminance(c_p.rgb);
 
-					float z_p = abs(imageLoad(tex_vbuf_curr, p).x);
-					vec3 n_p = uncompress_normal(imageLoad(tex_normal_curr, p).rg);
+                    float z_p = abs(imageLoad(tex_vbuf_curr, p).x);
+                    vec3 n_p = uncompress_normal(imageLoad(tex_normal_curr, p).rg);
 
-					float w_z = abs(z_p - z_center) / (delta_z * length(vec2(xx, yy)) + 1e-2);
+                    float w_z = abs(z_p - z_center) / (delta_z * length(vec2(xx, yy)) + 1e-2);
                     float w_n = pow(max(0, dot(n_p, n_center)), 128.0);
 
-					uint mesh_id_p = floatBitsToUint(imageLoad(tex_vbuf_curr, p).y);
+                    uint mesh_id_p = floatBitsToUint(imageLoad(tex_vbuf_curr, p).y);
 
                     float dv_p = imageLoad(tex_volume_curr, p).x;
                     float w_v = exp(-abs(dv_p - dv_center));
 
-					float w = w_v * exp(- w_z) * w_n * (mesh_id_center == mesh_id_p ? 1.0 : 0.0);
+                    float w = w_v * exp(- w_z) * w_n * (mesh_id_center == mesh_id_p ? 1.0 : 0.0);
 
-					if(isnan(w))
-						w = 0.0;
+                    if(isnan(w))
+                        w = 0.0;
 
-					sum_w += w;
+                    sum_w += w;
 
-					m += vec2(l, l * l) * w;
-					c.rgb += c_p.rgb * w;
-				}
-			}
-		}
+                    m += vec2(l, l * l) * w;
+                    c.rgb += c_p.rgb * w;
+                }
+            }
+        }
 
-		m /= sum_w;
-		c.rgb /= sum_w;
+        m /= sum_w;
+        c.rgb /= sum_w;
 
-		moments_spatial = m;
-		color_spatial = c.rgb;
-
-		variance_spatial = (1.0 + 2.0 * (1.0 - histlen / hist_len_thresh)) * max(0.0, m.y - m.x * m.x);
-		imageStore(img_varianceA, ipos, vec4(c.rgb, (1.0 + 3.0 * (1.0 - histlen / hist_len_thresh)) * max(0.0, m.y - m.x * m.x)));
-	}
-	else {
-		float variance_temporal = max(0.0, m.y - m.x * m.x);
-		imageStore(img_varianceA, ipos, vec4(c.rgb, variance_temporal));
+        imageStore(img_varianceA, ipos, vec4(c.rgb, (1.0 + 3.0 * (1.0 - histlen / hist_len_thresh)) * max(0.0, m.y - m.x * m.x)));
+    }
+    else {
+        float variance_temporal = max(0.0, m.y - m.x * m.x);
+        imageStore(img_varianceA, ipos, vec4(c.rgb, variance_temporal));
     }
 }

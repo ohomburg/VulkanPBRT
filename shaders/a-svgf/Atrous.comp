@@ -35,29 +35,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "svgf_shared.glsl"
 
 const float gaussian_kernel[3][3] = {
-	{ 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 },
-	{ 1.0 / 8.0,  1.0 / 4.0, 1.0 / 8.0  },
-	{ 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 }
+    { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 },
+    { 1.0 / 8.0,  1.0 / 4.0, 1.0 / 8.0  },
+    { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 }
 };
 
 float compute_sigma_luminance(float center, ivec2 ipos)
 {
-	const int r = 1;
+    const int r = 1;
 
-	float sum = center * gaussian_kernel[0][0];
+    float sum = center * gaussian_kernel[0][0];
 
-	for(int yy = -r; yy <= r; yy++) {
-		for(int xx = -r; xx <= r; xx++) {
-			if(xx != 0 || yy != 0) {
-				ivec2 p = ipos + ivec2(xx, yy);
-				float v = imageLoad(img_varianceA, p).a;
-				float w = gaussian_kernel[xx + 1][yy + 1];
-				sum += v * w;
-			}
-		}
-	}
+    for(int yy = -r; yy <= r; yy++) {
+        for(int xx = -r; xx <= r; xx++) {
+            if(xx != 0 || yy != 0) {
+                ivec2 p = ipos + ivec2(xx, yy);
+                float v = imageLoad(img_varianceA, p).a;
+                float w = gaussian_kernel[xx + 1][yy + 1];
+                sum += v * w;
+            }
+        }
+    }
 
-	return sqrt(max(sum, 0.0));
+    return sqrt(max(sum, 0.0));
 }
 
 ivec2 ipos = ivec2(gl_GlobalInvocationID.xy);
@@ -77,77 +77,77 @@ float sum_weight      = 1.0;
 
 void tap(ivec2 offset, float kernel_weight)
 {
-	ivec2 p = ipos + offset;
+    ivec2 p = ipos + offset;
 
-	vec4  color_p     = imageLoad(img_varianceA, p);
-	vec3  normal_p    = uncompress_normal(imageLoad(tex_normal_curr, p).rg);
-	float z_p         = abs(imageLoad(tex_vbuf_curr, p).x);
-	float l_p         = luminance(color_p.rgb);
+    vec4  color_p     = imageLoad(img_varianceA, p);
+    vec3  normal_p    = uncompress_normal(imageLoad(tex_normal_curr, p).rg);
+    float z_p         = abs(imageLoad(tex_vbuf_curr, p).x);
+    float l_p         = luminance(color_p.rgb);
     float dv_p        = imageLoad(tex_volume_curr, p).x;
 
-	float w_l = abs(l_p - l_center) / (sigma_l + 1e-10);
-	float w_z = 3.0 * abs(z_p - z_center) / (z_grad * length(vec2(offset) * step_size) + 1e-2);
-	float w_n = pow(max(0, dot(normal_p, normal_center)), 128.0);
+    float w_l = abs(l_p - l_center) / (sigma_l + 1e-10);
+    float w_z = 3.0 * abs(z_p - z_center) / (z_grad * length(vec2(offset) * step_size) + 1e-2);
+    float w_n = pow(max(0, dot(normal_p, normal_center)), 128.0);
     float w_v = exp(-abs(dv_p - dv_center));
 
-	float w = exp(-w_l * w_l - w_z) * kernel_weight * w_n;
+    float w = exp(-w_l * w_l - w_z) * kernel_weight * w_n;
 
-	sum_color    += color_p.rgb * w;
-	sum_variance += w * w * color_p.a;
-	sum_weight   += w;
+    sum_color    += color_p.rgb * w;
+    sum_variance += w * w * color_p.a;
+    sum_weight   += w;
 }
 
 void subsampled()
 {
-	/*
-	| | |x| | |
-	| |x| |x| |
-	|x| |x| |x|
-	| |x| |x| |
-	| | |x| | |
-	*/
+    /*
+    | | |x| | |
+    | |x| |x| |
+    |x| |x| |x|
+    | |x| |x| |
+    | | |x| | |
+    */
 
-	if((iteration & 1) == 0)
-	{
-		/*
-		| | | | | |
-		| |x| |x| |
-		|x| |x| |x|
-		| |x| |x| |
-		| | | | | |
-		*/
-		tap(ivec2(-2,  0) * step_size, 1.0);
-		tap(ivec2( 2,  0) * step_size, 1.0);
-	}
-	else
-	{
-		/*
-		| | |x| | |
-		| |x| |x| |
-		| | |x| | |
-		| |x| |x| |
-		| | |x| | |
-		*/
-		tap(ivec2( 0, -2) * step_size, 1.0);
-		tap(ivec2( 0,  2) * step_size, 1.0);
-	}
+    if((iteration & 1) == 0)
+    {
+        /*
+        | | | | | |
+        | |x| |x| |
+        |x| |x| |x|
+        | |x| |x| |
+        | | | | | |
+        */
+        tap(ivec2(-2,  0) * step_size, 1.0);
+        tap(ivec2( 2,  0) * step_size, 1.0);
+    }
+    else
+    {
+        /*
+        | | |x| | |
+        | |x| |x| |
+        | | |x| | |
+        | |x| |x| |
+        | | |x| | |
+        */
+        tap(ivec2( 0, -2) * step_size, 1.0);
+        tap(ivec2( 0,  2) * step_size, 1.0);
+    }
 
-	tap(ivec2(-1,  1) * step_size, 1.0);
-	tap(ivec2( 1,  1) * step_size, 1.0);
+    tap(ivec2(-1,  1) * step_size, 1.0);
+    tap(ivec2( 1,  1) * step_size, 1.0);
 
-	tap(ivec2(-1, -1) * step_size, 1.0);
-	tap(ivec2( 1, -1) * step_size, 1.0);
+    tap(ivec2(-1, -1) * step_size, 1.0);
+    tap(ivec2( 1, -1) * step_size, 1.0);
 }
 
 void box(int r)
 {
-	for(int yy = -r; yy <= r; yy++) {
-		for(int xx = -r; xx <= r; xx++) {
-			if(xx != 0 || yy != 0) {
-				tap(ivec2(xx, yy) * step_size, 1.0);
-			}
-		}
-	}
+    for(int yy = -r; yy <= r; yy++) {
+        for(int xx = -r; xx <= r; xx++) {
+            if(xx != 0 || yy != 0) {
+                tap(ivec2(xx, yy) * step_size, 1.0);
+            }
+        }
+    }
 }
 
 void box3() { box(1); }
@@ -155,43 +155,43 @@ void box5() { box(2); }
 
 void atrous()
 {
-	const float kernel[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
+    const float kernel[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
 
-	tap(ivec2( 1,  0) * step_size, 2.0 / 3.0);
-	tap(ivec2( 0,  1) * step_size, 2.0 / 3.0);
-	tap(ivec2(-1,  0) * step_size, 2.0 / 3.0);
-	tap(ivec2( 0, -1) * step_size, 2.0 / 3.0);
+    tap(ivec2( 1,  0) * step_size, 2.0 / 3.0);
+    tap(ivec2( 0,  1) * step_size, 2.0 / 3.0);
+    tap(ivec2(-1,  0) * step_size, 2.0 / 3.0);
+    tap(ivec2( 0, -1) * step_size, 2.0 / 3.0);
 
-	tap(ivec2( 2,  0) * step_size, 1.0 / 6.0);
-	tap(ivec2( 0,  2) * step_size, 1.0 / 6.0);
-	tap(ivec2(-2,  0) * step_size, 1.0 / 6.0);
-	tap(ivec2( 0, -2) * step_size, 1.0 / 6.0);
+    tap(ivec2( 2,  0) * step_size, 1.0 / 6.0);
+    tap(ivec2( 0,  2) * step_size, 1.0 / 6.0);
+    tap(ivec2(-2,  0) * step_size, 1.0 / 6.0);
+    tap(ivec2( 0, -2) * step_size, 1.0 / 6.0);
 
-	tap(ivec2( 1,  1) * step_size, 4.0 / 9.0);
-	tap(ivec2(-1,  1) * step_size, 4.0 / 9.0);
-	tap(ivec2(-1, -1) * step_size, 4.0 / 9.0);
-	tap(ivec2( 1, -1) * step_size, 4.0 / 9.0);
+    tap(ivec2( 1,  1) * step_size, 4.0 / 9.0);
+    tap(ivec2(-1,  1) * step_size, 4.0 / 9.0);
+    tap(ivec2(-1, -1) * step_size, 4.0 / 9.0);
+    tap(ivec2( 1, -1) * step_size, 4.0 / 9.0);
 
-	tap(ivec2( 1,  2) * step_size, 1.0 / 9.0);
-	tap(ivec2(-1,  2) * step_size, 1.0 / 9.0);
-	tap(ivec2(-1, -2) * step_size, 1.0 / 9.0);
-	tap(ivec2( 1, -2) * step_size, 1.0 / 9.0);
+    tap(ivec2( 1,  2) * step_size, 1.0 / 9.0);
+    tap(ivec2(-1,  2) * step_size, 1.0 / 9.0);
+    tap(ivec2(-1, -2) * step_size, 1.0 / 9.0);
+    tap(ivec2( 1, -2) * step_size, 1.0 / 9.0);
 
-	tap(ivec2( 2,  1) * step_size, 1.0 / 9.0);
-	tap(ivec2(-2,  1) * step_size, 1.0 / 9.0);
-	tap(ivec2(-2, -1) * step_size, 1.0 / 9.0);
-	tap(ivec2( 2, -1) * step_size, 1.0 / 9.0);
+    tap(ivec2( 2,  1) * step_size, 1.0 / 9.0);
+    tap(ivec2(-2,  1) * step_size, 1.0 / 9.0);
+    tap(ivec2(-2, -1) * step_size, 1.0 / 9.0);
+    tap(ivec2( 2, -1) * step_size, 1.0 / 9.0);
 
-	tap(ivec2( 2,  2) * step_size, 1.0 / 36.0);
-	tap(ivec2(-2,  2) * step_size, 1.0 / 36.0);
-	tap(ivec2(-2, -2) * step_size, 1.0 / 36.0);
-	tap(ivec2( 2, -2) * step_size, 1.0 / 36.0);
+    tap(ivec2( 2,  2) * step_size, 1.0 / 36.0);
+    tap(ivec2(-2,  2) * step_size, 1.0 / 36.0);
+    tap(ivec2(-2, -2) * step_size, 1.0 / 36.0);
+    tap(ivec2( 2, -2) * step_size, 1.0 / 36.0);
 }
 
 void main()
 {
-	if(z_center.x > 0) {
-	    // only filter foreground pixels
+    if(z_center.x > 0) {
+        // only filter foreground pixels
         switch(FILTER_KERNEL)
         {
         case 0: atrous(); break;
@@ -211,20 +211,20 @@ void main()
                 subsampled();
             break;
         }
-	}
+    }
 
-	sum_color    /= sum_weight;
-	sum_variance /= sum_weight * sum_weight;
+    sum_color    /= sum_weight;
+    sum_variance /= sum_weight * sum_weight;
 
-	vec4 frag_color      = vec4(sum_color, sum_variance);
+    vec4 frag_color      = vec4(sum_color, sum_variance);
 
-	if(modulate_albedo > 0) {
-	    // DANGER: keep the constant in with the epsilon added on demodulation
-		frag_color.rgb *= imageLoad(tex_albedo, ipos).rgb + vec3(1e-6);
-		// tone mapping
+    if(modulate_albedo > 0) {
+        // DANGER: keep the constant in with the epsilon added on demodulation
+        frag_color.rgb *= imageLoad(tex_albedo, ipos).rgb + vec3(1e-6);
+        // tone mapping
         frag_color.rgb = LINEARtoSRGB(vec4(frag_color.rgb, 1)).xyz;
         frag_color.rgb = clamp(frag_color.rgb, vec3(0), vec3(1));
-	}
+    }
 
-	imageStore(img_varianceB, ipos, frag_color);
+    imageStore(img_varianceB, ipos, frag_color);
 }

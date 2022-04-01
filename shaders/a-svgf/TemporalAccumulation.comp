@@ -50,28 +50,28 @@ int gradientFilterRadius;
 
 void main()
 {
-	ivec2 ipos   = ivec2(gl_GlobalInvocationID.xy);
-	ivec2 size   = imageSize(tex_motion).rg;
+    ivec2 ipos   = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size   = imageSize(tex_motion).rg;
 
-	vec2 pos_prev = imageLoad(tex_motion, ipos).rg * vec2(size - 1);
+    vec2 pos_prev = imageLoad(tex_motion, ipos).rg * vec2(size - 1);
 
-	ivec2 p = ivec2(pos_prev - 0.5);
-	vec2  w = (pos_prev - 0.5) - floor(pos_prev - 0.5);
+    ivec2 p = ivec2(pos_prev - 0.5);
+    vec2  w = (pos_prev - 0.5) - floor(pos_prev - 0.5);
 
     float z_curr       = abs(imageLoad(tex_vbuf_curr, ipos).x);
-	vec3  color_curr   = imageLoad(tex_color,       ipos).rgb;
-	vec3  normal_curr  = uncompress_normal(imageLoad(tex_normal_curr, ipos).rg);
-	float l            = luminance(color_curr);
-	vec2  moments_curr = vec2(l, l * l);
-	uint  mesh_id_curr = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
-	vec3  cloud_curr   = vec3(0);
+    vec3  color_curr   = imageLoad(tex_color,       ipos).rgb;
+    vec3  normal_curr  = uncompress_normal(imageLoad(tex_normal_curr, ipos).rg);
+    float l            = luminance(color_curr);
+    vec2  moments_curr = vec2(l, l * l);
+    uint  mesh_id_curr = floatBitsToUint(imageLoad(tex_vbuf_curr, ipos).y);
+    vec3  cloud_curr   = vec3(0);
 
-	vec4 color_prev   = vec4(0);
-	vec2 moments_prev = vec2(0);
-	float sum_w       = 0.0;
-	float histlen     = 0.0;
+    vec4 color_prev   = vec4(0);
+    vec2 moments_prev = vec2(0);
+    float sum_w       = 0.0;
+    float histlen     = 0.0;
 
-	imageStore(img_debug, ipos, vec4(0));
+    imageStore(img_debug, ipos, vec4(0));
     if (mesh_id_curr >= 0x80000000)
     {
         cloud_curr = imageLoad(tex_volume_curr, ipos).rgb;
@@ -111,9 +111,9 @@ void main()
             histlen = 4; // threshold for temporal variance estimate
         }
     }
-	else if (pos_prev.x >= 0 && pos_prev.y >= 0 && mesh_id_curr != 0)
-	{
-		// bilinear interpolation, check each tap individually, renormalize afterwards
+    else if (pos_prev.x >= 0 && pos_prev.y >= 0 && mesh_id_curr != 0)
+    {
+        // bilinear interpolation, check each tap individually, renormalize afterwards
         for (int yy = 0; yy <= 1; yy++) {
             for (int xx = 0; xx <= 1; xx++) {
                 ivec2 ipos_prev    = p + ivec2(xx, yy);
@@ -137,76 +137,76 @@ void main()
                 }
             }
         }
-	}
+    }
 
 #ifdef ANTILAG
-	float antilag_alpha = 0.0;
+    float antilag_alpha = 0.0;
 
-	{
-		vec4 v = textureLod(tex_diff_current, texC, 0); // Compute shader port: replace texC using global inv. id
+    {
+        vec4 v = textureLod(tex_diff_current, texC, 0); // Compute shader port: replace texC using global inv. id
 
-		const float gaussian_kernel[3][3] = {
-			{ 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 },
-			{ 1.0 / 8.0,  1.0 / 4.0, 1.0 / 8.0  },
-			{ 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 }
-		};
+        const float gaussian_kernel[3][3] = {
+            { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 },
+            { 1.0 / 8.0,  1.0 / 4.0, 1.0 / 8.0  },
+            { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 }
+        };
 
-		const int r = gradientFilterRadius;
+        const int r = gradientFilterRadius;
 
-		antilag_alpha = 0.0;
-		for(int yy = -r; yy <= r; yy++) {
-			for(int xx = -r; xx <= r; xx++) {
-				vec4 v = imageLoad(tex_diff_current, ipos / gradientDownsample + ivec2(xx, yy));
-				float a = clamp(abs(v.r > 1e-4 ? abs(v.g) / v.r : 0.0), 0.0, 200.0);
-				float w = 1.0 / float((2 * r + 1) * (2 * r + 1));
-				antilag_alpha = max(antilag_alpha, a);
-			}
-		}
-	}
+        antilag_alpha = 0.0;
+        for(int yy = -r; yy <= r; yy++) {
+            for(int xx = -r; xx <= r; xx++) {
+                vec4 v = imageLoad(tex_diff_current, ipos / gradientDownsample + ivec2(xx, yy));
+                float a = clamp(abs(v.r > 1e-4 ? abs(v.g) / v.r : 0.0), 0.0, 200.0);
+                float w = 1.0 / float((2 * r + 1) * (2 * r + 1));
+                antilag_alpha = max(antilag_alpha, a);
+            }
+        }
+    }
 
-	clamp(antilag_alpha, 0.0, 1.0);
-	if(isnan(antilag_alpha))
-		antilag_alpha = 1.0;
+    clamp(antilag_alpha, 0.0, 1.0);
+    if(isnan(antilag_alpha))
+        antilag_alpha = 1.0;
 
 #endif
 
-	if (sum_w > 0.01 && !any(isnan(color_prev))) { /* found sufficiently reliable history information */
-		color_prev   /= sum_w;
-		moments_prev /= sum_w;
-		histlen      /= sum_w;
+    if (sum_w > 0.01 && !any(isnan(color_prev))) { /* found sufficiently reliable history information */
+        color_prev   /= sum_w;
+        moments_prev /= sum_w;
+        histlen      /= sum_w;
 
 #ifndef ANTILAG
-		const float alpha_color   = max(temporal_alpha, 1.0 / (histlen + 1.0));
-		const float alpha_moments = max(0.6, 1.0 / (histlen + 1.0));
+        const float alpha_color   = max(temporal_alpha, 1.0 / (histlen + 1.0));
+        const float alpha_moments = max(0.6, 1.0 / (histlen + 1.0));
 #else
-		float alpha_color   = max(temporal_alpha, 1.0 / (histlen + 1.0));
-		float alpha_moments = max(0.6, 1.0 / (histlen + 1.0));
+        float alpha_color   = max(temporal_alpha, 1.0 / (histlen + 1.0));
+        float alpha_moments = max(0.6, 1.0 / (histlen + 1.0));
 
-		alpha_color   = mix(alpha_color,   1.0, antilag_alpha);
-		alpha_moments = mix(alpha_moments, 1.0, antilag_alpha);
+        alpha_color   = mix(alpha_color,   1.0, antilag_alpha);
+        alpha_moments = mix(alpha_moments, 1.0, antilag_alpha);
 
   #ifdef SHOW_ANTILAG_ALPHA
-		imageStore(img_antilag_alpha, ipos, vec4(viridis_quintic(alpha_color), 0.0));
+        imageStore(img_antilag_alpha, ipos, vec4(viridis_quintic(alpha_color), 0.0));
   #endif
 #endif
-		imageStore(img_accumulated, ipos, vec4(mix(color_prev.rgb, color_curr, alpha_color), min(MAX_HISTLEN, histlen + 1.0)));
-		imageStore(img_moments, ipos, vec4(mix(moments_prev, moments_curr, alpha_moments), 0, 0));
-		#ifdef ANTILAG
-		imageStore(img_histlen, ipos, vec4(clamp(1.0 / alpha_color, 0.0, float(MAX_HISTLEN))));
-		#else
-		imageStore(img_histlen, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0)));
-		#endif
-	}
-	else
-	{
-		imageStore(img_accumulated, ipos, vec4(color_curr, 1.0));
-		imageStore(img_moments, ipos, vec4(moments_curr, 0, 0));
-		imageStore(img_histlen, ipos, vec4(1.0));
+        imageStore(img_accumulated, ipos, vec4(mix(color_prev.rgb, color_curr, alpha_color), min(MAX_HISTLEN, histlen + 1.0)));
+        imageStore(img_moments, ipos, vec4(mix(moments_prev, moments_curr, alpha_moments), 0, 0));
+        #ifdef ANTILAG
+        imageStore(img_histlen, ipos, vec4(clamp(1.0 / alpha_color, 0.0, float(MAX_HISTLEN))));
+        #else
+        imageStore(img_histlen, ipos, vec4(min(MAX_HISTLEN, histlen + 1.0)));
+        #endif
+    }
+    else
+    {
+        imageStore(img_accumulated, ipos, vec4(color_curr, 1.0));
+        imageStore(img_moments, ipos, vec4(moments_curr, 0, 0));
+        imageStore(img_histlen, ipos, vec4(1.0));
 #ifdef ANTILAG
   #ifdef SHOW_ANTILAG_ALPHA
-		imageStore(img_antilag_alpha, ipos, vec4(viridis_quintic(1), 0.0));
+        imageStore(img_antilag_alpha, ipos, vec4(viridis_quintic(1), 0.0));
   #endif
 #endif
-	}
+    }
     //imageStore(img_debug, ipos, vec4(cloud_curr * vec2(0.2, 10), 0, 0));
 }

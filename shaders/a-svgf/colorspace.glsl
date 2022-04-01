@@ -30,26 +30,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 float
 luminance(in vec3 color)
 {
-	return dot(color, vec3(0.299, 0.587, 0.114));
+    return dot(color, vec3(0.299, 0.587, 0.114));
 }
 
 
 vec3
 rgb_to_yuv(vec3 rgb)
 {
-	return mat3(
-		0.299, -0.14713,  0.615,
-		0.587, -0.28886, -0.51499,
-		0.114,  0.436,   -0.10001) * rgb;
+    return mat3(
+        0.299, -0.14713,  0.615,
+        0.587, -0.28886, -0.51499,
+        0.114,  0.436,   -0.10001) * rgb;
 }
 
 vec3
 yuv_to_rgb(vec3 yuv)
 {
-	return mat3(
-		1.0,      1.0,     1.0,
-		0.0,     -0.39465, 2.03211,
-		1.13983, -0.58060, 0.0) * yuv;
+    return mat3(
+        1.0,      1.0,     1.0,
+        0.0,     -0.39465, 2.03211,
+        1.13983, -0.58060, 0.0) * yuv;
 }
 
 vec4 LINEARtoSRGB(vec4 srgbIn)

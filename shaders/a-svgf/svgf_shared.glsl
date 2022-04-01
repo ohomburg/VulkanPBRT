@@ -38,19 +38,19 @@ vec3 uncompress_normal(vec2 comp)
 
 bool test_reprojected_normal(vec3 n1, vec3 n2)
 {
-	return dot(n1, n2) > 0.95;
+    return dot(n1, n2) > 0.95;
 }
 
 bool test_inside_screen(ivec2 p, ivec2 res)
 {
-	return all(greaterThanEqual(p, ivec2(0)))
-		&& all(lessThan(p, res));
+    return all(greaterThanEqual(p, ivec2(0)))
+        && all(lessThan(p, res));
 }
 
 bool test_reprojected_depth(float z1, float z2, float dz)
 {
-	float z_diff = abs(z1 - z2);
-	return z_diff < 2.0 * (dz + 1e-3);
+    float z_diff = abs(z1 - z2);
+    return z_diff < 2.0 * (dz + 1e-3);
 }
 
 #define TILE_OFFSET_SHIFT 3u
@@ -58,26 +58,26 @@ bool test_reprojected_depth(float z1, float z2, float dz)
 
 ivec2 get_gradient_tile_pos(uint idx, int gradientDownsample)
 {
-	/* didn't store a gradient sample in the previous frame, this creates
-	   a new sample in the center of the tile */
-	if(idx < (1u<<31))
-		return ivec2(gradientDownsample / 2);
+    /* didn't store a gradient sample in the previous frame, this creates
+       a new sample in the center of the tile */
+    if(idx < (1u<<31))
+        return ivec2(gradientDownsample / 2);
 
-	return ivec2((idx & TILE_OFFSET_MASK), (idx >> TILE_OFFSET_SHIFT) & TILE_OFFSET_MASK);
+    return ivec2((idx & TILE_OFFSET_MASK), (idx >> TILE_OFFSET_SHIFT) & TILE_OFFSET_MASK);
 }
 
 uint get_gradient_idx_from_tile_pos(ivec2 pos)
 {
-	return (1 << 31) | (pos.x) | (pos.y << TILE_OFFSET_SHIFT);
+    return (1 << 31) | (pos.x) | (pos.y << TILE_OFFSET_SHIFT);
 }
 
 bool is_gradient_sample(uimage2D tex_gradient, ivec2 ipos, int gradientDownsample)
 {
-	ivec2 ipos_grad = ipos / gradientDownsample;
-	uint u = imageLoad(tex_gradient, ipos_grad).r;
+    ivec2 ipos_grad = ipos / gradientDownsample;
+    uint u = imageLoad(tex_gradient, ipos_grad).r;
 
-	ivec2 tile_pos = ivec2((u & TILE_OFFSET_MASK), (u >> TILE_OFFSET_SHIFT) & TILE_OFFSET_MASK);
-	return (u >= (1u << 31) && all(equal(ipos_grad * gradientDownsample + tile_pos, ipos)));
+    ivec2 tile_pos = ivec2((u & TILE_OFFSET_MASK), (u >> TILE_OFFSET_SHIFT) & TILE_OFFSET_MASK);
+    return (u >= (1u << 31) && all(equal(ipos_grad * gradientDownsample + tile_pos, ipos)));
 }
 
 #ifndef NO_BINDINGS
@@ -127,9 +127,9 @@ layout(constant_id=1) const int CLOUD_SAMPLE_COUNT = 5;
 
 layout(push_constant) uniform PerImageCB {
     mat4 mat_reproj; // VP-matrix times inverse of previous VP-matrix
-	int iteration;
-	int step_size;
-	int gradientDownsample;
+    int iteration;
+    int step_size;
+    int gradientDownsample;
     float temporal_alpha;
     int modulate_albedo;
 };
