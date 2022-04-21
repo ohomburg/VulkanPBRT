@@ -90,7 +90,7 @@ void tap(ivec2 offset, float kernel_weight)
     float w_n = pow(max(0, dot(normal_p, normal_center)), 128.0);
     float w_v = exp(-abs(dv_p - dv_center));
 
-    float w = exp(-w_l * w_l - w_z) * kernel_weight * w_n;
+    float w = exp(-w_l * w_l - w_z) * kernel_weight * w_n * w_v;
 
     sum_color    += color_p.rgb * w;
     sum_variance += w * w * color_p.a;
